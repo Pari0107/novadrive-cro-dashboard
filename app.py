@@ -2,6 +2,10 @@ import streamlit as st
 import pandas as pd
 import re
 import math
+from io import BytesIO
+
+import plotly.graph_objects as go
+
 
 # ============================================================
 # PAGE CONFIGURATION
@@ -12,6 +16,7 @@ st.set_page_config(
     page_icon="🏭",
     layout="wide"
 )
+
 
 # ============================================================
 # LOAD DATA
@@ -32,154 +37,33 @@ def load_data():
         "data/event_alerts.csv"
     )
 
-    return supplier_network, supplier_entities, event_alerts
+    return (
+        supplier_network,
+        supplier_entities,
+        event_alerts
+    )
 
 
 supplier_network, supplier_entities, event_alerts = load_data()
 
 
 # ============================================================
-# NETWORK PREPARATION
+# GENERAL HELPERS
 # ============================================================
 
-def build_network():
+def severity_count(df, severity):
 
-    nodes = set()
+    if "Severity" not in df.columns:
+        return 0
 
-    for _, row in supplier_network.iterrows():
+    return int(
+        df["Severity"]
+        .astype(str)
+        .str.upper()
+        .eq(severity.upper())
+        .sum()
+    )
 
-        if pd.notna(row.get("From")):
-            nodes.add(str(row["From"]))
-
-        if pd.notna(row.get("To")):
-            nodes.add(str(row["To"]))
-
-    # NovaDrive should always appear
-    nodes.add("NovaDrive Technologies")
-
-    edges = []
-
-    for _, row in supplier_network.iterrows():
-
-        if pd.notna(row.get("From")) and pd.notna(row.get("To")):
-
-            edges.append(
-                (
-                    str(row["From"]),
-                    str(row["To"])
-                )
-            )
-
-    return sorted(nodes), edges
-
-
-network_nodes, network_edges = build_network()
-
-
-# ============================================================
-# NETWORK FUNCTIONS
-# ============================================================
-
-def build_adjacency():
-
-    adjacency = {}
-
-    for node in network_nodes:
-        adjacency[node] = []
-
-    for source, target in network_edges:
-
-        if source not in adjacency:
-            adjacency[source] = []
-
-        adjacency[source].append(target)
-
-    return adjacency
-
-
-adjacency = build_adjacency()
-
-
-def get_downstream_nodes(start_nodes):
-
-    """
-    Returns all confirmed downstream nodes affected by an issue
-    at one or more supplier nodes.
-    """
-
-    affected = set()
-
-    queue = list(start_nodes)
-
-    while queue:
-
-        current = queue.pop(0)
-
-        if current in affected:
-            continue
-
-        affected.add(current)
-
-        for downstream in adjacency.get(current, []):
-
-            if downstream not in affected:
-                queue.append(downstream)
-
-    return affected
-
-
-def get_tier(node):
-
-    if node == "NovaDrive Technologies":
-        return "NovaDrive"
-
-    matches = supplier_entities[
-        supplier_entities["Entity"].astype(str) == str(node)
-    ]
-
-    if len(matches) > 0 and "Tier" in matches.columns:
-        return str(matches.iloc[0]["Tier"])
-
-    # fallback from network
-    matches = supplier_network[
-        supplier_network["From"].astype(str) == str(node)
-    ]
-
-    if len(matches) > 0 and "From Tier" in matches.columns:
-        return str(matches.iloc[0]["From Tier"])
-
-    return "Unknown"
-
-
-def get_supplier_facilities():
-
-    facility_map = {}
-
-    if "Facility" not in supplier_network.columns:
-        return facility_map
-
-    for _, row in supplier_network.iterrows():
-
-        supplier = str(row.get("From", ""))
-
-        facility = row.get("Facility")
-
-        if pd.notna(facility):
-
-            facility_map.setdefault(
-                supplier,
-                set()
-            ).add(str(facility))
-
-    return facility_map
-
-
-supplier_facilities = get_supplier_facilities()
-
-
-# ============================================================
-# EVENT MATCHING
-# ============================================================
 
 def normalize_text(text):
 
@@ -203,84 +87,397 @@ def normalize_text(text):
     return text.strip()
 
 
-def match_new_event(event_text):
+# ============================================================
+# BUILD CONFIRMED NETWORK
+# ============================================================
 
-    """
-    Match a new event to confirmed network entities.
+network_nodes = set()
 
-    Matching is intentionally conservative:
-    supplier names and confirmed facility IDs are used.
-    """
+for _, row in supplier_network.iterrows():
 
-    text = normalize_text(event_text)
+    if pd.notna(row.get("From")):
+        network_nodes.add(
+            str(row["From"])
+        )
 
-    matches = []
+    if pd.notna(row.get("To")):
+        network_nodes.add(
+            str(row["To"])
+        )
 
-    # --------------------------------------------------------
-    # Supplier name matching
-    # --------------------------------------------------------
 
-    for supplier in network_nodes:
+network_nodes.add(
+    "NovaDrive Technologies"
+)
 
-        if supplier == "NovaDrive Technologies":
-            continue
+network_nodes = sorted(
+    network_nodes
+)
 
-        supplier_norm = normalize_text(supplier)
 
-        # Full supplier name
-        if supplier_norm in text:
+network_edges = []
 
-            matches.append(
-                {
-                    "Supplier": supplier,
-                    "Match Type": "Supplier name",
-                    "Matched On": supplier
-                }
+for _, row in supplier_network.iterrows():
+
+    if (
+        pd.notna(row.get("From"))
+        and
+        pd.notna(row.get("To"))
+    ):
+
+        network_edges.append(
+            (
+                str(row["From"]),
+                str(row["To"])
+            )
+        )
+
+
+# ============================================================
+# TIER FUNCTIONS
+# ============================================================
+
+def get_tier(node):
+
+    if node == "NovaDrive Technologies":
+        return "NovaDrive"
+
+    matches = supplier_entities[
+        supplier_entities["Entity"]
+        .astype(str)
+        == str(node)
+    ]
+
+    if len(matches) > 0:
+
+        if "Tier" in matches.columns:
+
+            return str(
+                matches.iloc[0]["Tier"]
             )
 
-            continue
+    matches = supplier_network[
+        supplier_network["From"]
+        .astype(str)
+        == str(node)
+    ]
 
-        # Legal-name shortened matching
-        words = supplier_norm.split()
+    if len(matches) > 0:
 
-        if len(words) >= 2:
+        if "From Tier" in matches.columns:
 
-            meaningful_words = [
-                word
-                for word in words
-                if len(word) >= 5
-            ]
+            return str(
+                matches.iloc[0]["From Tier"]
+            )
 
-            if meaningful_words:
+    return "Unknown"
 
-                matched_words = sum(
-                    word in text
-                    for word in meaningful_words
-                )
 
-                if matched_words >= max(
-                    1,
-                    math.ceil(len(meaningful_words) * 0.7)
-                ):
+tier1_nodes = [
+    n for n in network_nodes
+    if get_tier(n) == "Tier 1"
+]
 
-                    matches.append(
-                        {
-                            "Supplier": supplier,
-                            "Match Type": "Supplier name",
-                            "Matched On": supplier
-                        }
-                    )
+tier2_nodes = [
+    n for n in network_nodes
+    if get_tier(n) == "Tier 2"
+]
 
-                    continue
+tier3_nodes = [
+    n for n in network_nodes
+    if get_tier(n) == "Tier 3"
+]
+
+
+# ============================================================
+# EXACT COLAB-STYLE ORDERING
+# ============================================================
+
+# Tier 1 was alphabetically ordered in the final Colab graph.
+
+tier1_order = sorted(
+    tier1_nodes
+)
+
+tier1_position = {
+    node: i
+    for i, node in enumerate(tier1_order)
+}
+
+
+# Tier 2:
+# order by the average downstream Tier-1 position.
+
+tier2_scores = {}
+
+for node in tier2_nodes:
+
+    downstream = [
+        target
+        for source, target in network_edges
+        if source == node
+        and target in tier1_position
+    ]
+
+    if downstream:
+
+        avg_position = sum(
+            tier1_position[x]
+            for x in downstream
+        ) / len(downstream)
+
+    else:
+
+        avg_position = 999
+
+    tier2_scores[node] = avg_position
+
+
+tier2_order = sorted(
+    tier2_nodes,
+    key=lambda x: (
+        tier2_scores.get(x, 999),
+        x
+    )
+)
+
+tier2_position = {
+    node: i
+    for i, node in enumerate(tier2_order)
+}
+
+
+# Tier 3:
+# order by the average downstream Tier-2 position.
+
+tier3_scores = {}
+
+for node in tier3_nodes:
+
+    downstream = [
+        target
+        for source, target in network_edges
+        if source == node
+        and target in tier2_position
+    ]
+
+    if downstream:
+
+        avg_position = sum(
+            tier2_position[x]
+            for x in downstream
+        ) / len(downstream)
+
+    else:
+
+        avg_position = 999
+
+    tier3_scores[node] = avg_position
+
+
+tier3_order = sorted(
+    tier3_nodes,
+    key=lambda x: (
+        tier3_scores.get(x, 999),
+        x
+    )
+)
+
+
+# ============================================================
+# EXACT COLAB-STYLE MANUAL POSITIONS
+# ============================================================
+
+X_POSITIONS = {
+    "Tier 3": 0,
+    "Tier 2": 3.4,
+    "Tier 1": 6.8,
+    "NovaDrive": 10.2
+}
+
+vertical_spacing = 1.25
+
+
+def make_positions():
+
+    positions = {}
+
+    # --------------------------------------------------------
+    # Tier 1
+    # --------------------------------------------------------
+
+    if tier1_order:
+
+        total = len(tier1_order)
+
+        for i, node in enumerate(tier1_order):
+
+            y = (
+                (total - 1) / 2
+                - i
+            ) * vertical_spacing
+
+            positions[node] = (
+                X_POSITIONS["Tier 1"],
+                y
+            )
+
+    # --------------------------------------------------------
+    # Tier 2
+    # --------------------------------------------------------
+
+    if tier2_order:
+
+        total = len(tier2_order)
+
+        for i, node in enumerate(tier2_order):
+
+            y = (
+                (total - 1) / 2
+                - i
+            ) * vertical_spacing
+
+            positions[node] = (
+                X_POSITIONS["Tier 2"],
+                y
+            )
+
+    # --------------------------------------------------------
+    # Tier 3
+    # --------------------------------------------------------
+
+    if tier3_order:
+
+        total = len(tier3_order)
+
+        for i, node in enumerate(tier3_order):
+
+            y = (
+                (total - 1) / 2
+                - i
+            ) * vertical_spacing
+
+            positions[node] = (
+                X_POSITIONS["Tier 3"],
+                y
+            )
+
+    # --------------------------------------------------------
+    # NovaDrive
+    # --------------------------------------------------------
+
+    positions[
+        "NovaDrive Technologies"
+    ] = (
+        X_POSITIONS["NovaDrive"],
+        0
+    )
+
+    return positions
+
+
+positions = make_positions()
+
+
+# ============================================================
+# SUPPLIER FACILITIES
+# ============================================================
+
+supplier_facilities = {}
+
+if "Facility" in supplier_network.columns:
+
+    for _, row in supplier_network.iterrows():
+
+        supplier = str(
+            row.get("From", "")
+        )
+
+        facility = row.get(
+            "Facility"
+        )
+
+        if pd.notna(facility):
+
+            supplier_facilities.setdefault(
+                supplier,
+                set()
+            ).add(
+                str(facility)
+            )
+
+
+# ============================================================
+# GEOGRAPHIC ZONE MAPPING
+# Based on confirmed Supplier Universe
+# ============================================================
+
+ZONE_SUPPLIERS = {
+
+    "Z01": [
+        "IonPeak Semiconductor Ltd.",
+        "Jade Printed Circuits Ltd.",
+        "Orion Ceramics Ltd.",
+        "Umber Silicon Carbide Ltd."
+    ],
+
+    "Z02": [
+        "Aster Power Assemblies Ltd.",
+        "ForgeLine Enclosures Ltd.",
+        "Quartz Alloy Ltd."
+    ],
+
+    "Z03": [
+        "Delta Capacitor Works Ltd.",
+        "Meridian Dielectrics Ltd.",
+        "Zenith Polymer Ltd."
+    ],
+
+    "Z04": [
+        "Cobalt Control Electronics Ltd.",
+        "Grove Battery Controls Ltd.",
+        "Lumen Magnetics Ltd.",
+        "Rill Connectors Ltd.",
+        "Xenon Resin Ltd."
+    ],
+
+    "Z05": [
+        "Boreal Power Systems Ltd.",
+        "HarborSense Electronics Ltd.",
+        "Kestrel Microdevices Ltd."
+    ],
+
+    "Z06": [
+        "Estuary Thermal Systems Ltd.",
+        "Nacre Foils Ltd.",
+        "Pine Thermal Metals Ltd.",
+        "Warden Copper Foil Ltd."
+    ],
+
+    "Z08": [
+        "Yarrow Specialty Minerals Ltd."
+    ]
+}
+
+
+# ============================================================
+# EVENT MATCHING
+# ============================================================
+
+def match_new_event(event_text):
+
+    text = normalize_text(
+        event_text
+    )
+
+    matches = []
 
     # --------------------------------------------------------
     # Facility matching
     # --------------------------------------------------------
 
-    facility_pattern = r"SITE-\d+"
-
     facilities_in_text = re.findall(
-        facility_pattern,
+        r"SITE-\d+",
         event_text.upper()
     )
 
@@ -298,7 +495,126 @@ def match_new_event(event_text):
                     }
                 )
 
+
+    # --------------------------------------------------------
+    # Supplier matching
+    # --------------------------------------------------------
+
+    for supplier in network_nodes:
+
+        if supplier == "NovaDrive Technologies":
+            continue
+
+        supplier_norm = normalize_text(
+            supplier
+        )
+
+        # Full legal name
+        if supplier_norm in text:
+
+            matches.append(
+                {
+                    "Supplier": supplier,
+                    "Match Type": "Supplier name",
+                    "Matched On": supplier
+                }
+            )
+
+            continue
+
+
+        # Short name / distinctive words
+        words = supplier_norm.split()
+
+        meaningful_words = [
+            word
+            for word in words
+            if len(word) >= 5
+        ]
+
+        if meaningful_words:
+
+            matched_words = sum(
+                word in text
+                for word in meaningful_words
+            )
+
+            if matched_words >= max(
+                1,
+                math.ceil(
+                    len(meaningful_words) * 0.7
+                )
+            ):
+
+                # Avoid known false-positive pattern
+                # such as Ion Peak Trading vs IonPeak Semiconductor.
+
+                if (
+                    supplier
+                    == "IonPeak Semiconductor Ltd."
+                    and
+                    (
+                        "trading" in text
+                        or
+                        "broker" in text
+                    )
+                ):
+                    continue
+
+                matches.append(
+                    {
+                        "Supplier": supplier,
+                        "Match Type": "Supplier name",
+                        "Matched On": supplier
+                    }
+                )
+
+
+    # --------------------------------------------------------
+    # Geographic matching
+    # --------------------------------------------------------
+
+    geography_aliases = {
+
+        "east delta": "Z01",
+        "east delta site": "Z01",
+
+        "harbor district": None,
+
+        "zone z01": "Z01",
+        "zone z02": "Z02",
+        "zone z03": "Z03",
+        "zone z04": "Z04",
+        "zone z05": "Z05",
+        "zone z06": "Z06",
+        "zone z08": "Z08"
+    }
+
+
+    for alias, zone in geography_aliases.items():
+
+        if alias in text and zone:
+
+            for supplier in ZONE_SUPPLIERS.get(
+                zone,
+                []
+            ):
+
+                if supplier in network_nodes:
+
+                    matches.append(
+                        {
+                            "Supplier": supplier,
+                            "Match Type": "Geography",
+                            "Matched On": alias
+                        }
+                    )
+
+
+    # --------------------------------------------------------
     # Remove duplicates
+    # --------------------------------------------------------
+
     unique = {}
 
     for match in matches:
@@ -310,83 +626,121 @@ def match_new_event(event_text):
 
         unique[key] = match
 
-    return list(unique.values())
+
+    return list(
+        unique.values()
+    )
 
 
 # ============================================================
-# GRAPH LAYOUT
+# DOWNSTREAM IMPACT
 # ============================================================
 
-def create_positions():
+def build_adjacency():
 
-    """
-    Create a stable left-to-right layout:
-    Tier 3 → Tier 2 → Tier 1 → NovaDrive
-    """
-
-    tiers = {
-        "Tier 3": [],
-        "Tier 2": [],
-        "Tier 1": [],
-        "NovaDrive": []
-    }
-
-    for node in network_nodes:
-
-        tier = get_tier(node)
-
-        if tier in tiers:
-            tiers[tier].append(node)
-
-    positions = {}
-
-    x_values = {
-        "Tier 3": 0,
-        "Tier 2": 1,
-        "Tier 1": 2,
-        "NovaDrive": 3
-    }
-
-    for tier, nodes in tiers.items():
-
-        nodes = sorted(nodes)
-
-        n = len(nodes)
-
-        for i, node in enumerate(nodes):
-
-            if n == 1:
-                y = 0
-
-            else:
-                y = (
-                    i
-                    - (n - 1) / 2
-                )
-
-            positions[node] = (
-                x_values[tier],
-                -y
-            )
-
-    # Any unresolved nodes
-    unresolved = [
-        node
+    adjacency = {
+        node: []
         for node in network_nodes
-        if node not in positions
-    ]
+    }
 
-    for i, node in enumerate(unresolved):
+    for source, target in network_edges:
 
-        positions[node] = (
-            1.5,
-            i
+        adjacency.setdefault(
+            source,
+            []
+        ).append(
+            target
         )
 
-    return positions
+    return adjacency
 
 
-positions = create_positions()
+adjacency = build_adjacency()
+
+
+def get_downstream_nodes(
+    start_nodes
+):
+
+    affected = set()
+
+    queue = list(
+        start_nodes
+    )
+
+    while queue:
+
+        current = queue.pop(0)
+
+        if current in affected:
+            continue
+
+        affected.add(
+            current
+        )
+
+        for downstream in adjacency.get(
+            current,
+            []
+        ):
+
+            if downstream not in affected:
+
+                queue.append(
+                    downstream
+                )
+
+    return affected
+
+
+# ============================================================
+# LABEL WRAPPING
+# ============================================================
+
+def wrap_label(
+    text,
+    width=20
+):
+
+    words = str(text).replace(
+        " Ltd.",
+        ""
+    ).replace(
+        " Technologies",
+        ""
+    ).split()
+
+    lines = []
+    current = ""
+
+    for word in words:
+
+        if len(
+            current + " " + word
+        ) <= width:
+
+            if current:
+                current += " "
+
+            current += word
+
+        else:
+
+            if current:
+                lines.append(
+                    current
+                )
+
+            current = word
+
+    if current:
+        lines.append(
+            current
+        )
+
+    return "<br>".join(
+        lines
+    )
 
 
 # ============================================================
@@ -406,190 +760,406 @@ def show_network_graph(
         selected_event_nodes or []
     )
 
-    try:
 
-        import plotly.graph_objects as go
+    # --------------------------------------------------------
+    # Colors from original Colab graph
+    # --------------------------------------------------------
 
-        edge_x = []
-        edge_y = []
+    tier_colors = {
 
-        for source, target in network_edges:
+        "Tier 3": "#D6EAF8",
 
-            if source not in positions:
-                continue
+        "Tier 2": "#D5F5E3",
 
-            if target not in positions:
-                continue
+        "Tier 1": "#FCF3CF",
 
-            x0, y0 = positions[source]
-            x1, y1 = positions[target]
+        "NovaDrive": "#F1948A"
+    }
 
-            edge_x.extend(
-                [x0, x1, None]
-            )
 
-            edge_y.extend(
-                [y0, y1, None]
-            )
+    # --------------------------------------------------------
+    # Figure
+    # --------------------------------------------------------
 
-        edge_trace = go.Scatter(
-            x=edge_x,
-            y=edge_y,
-            mode="lines",
-            line=dict(
-                width=1.5,
-                color="#A0A0A0"
-            ),
-            hoverinfo="none"
+    fig = go.Figure()
+
+
+    # --------------------------------------------------------
+    # EDGES
+    # --------------------------------------------------------
+
+    for source, target in network_edges:
+
+        if (
+            source not in positions
+            or
+            target not in positions
+        ):
+            continue
+
+        x0, y0 = positions[source]
+        x1, y1 = positions[target]
+
+
+        # Affected edge
+        affected_edge = (
+            source in highlighted_nodes
+            or
+            source in selected_event_nodes
+        ) and (
+            target in highlighted_nodes
+            or
+            target in selected_event_nodes
+            or
+            target == "NovaDrive Technologies"
         )
 
-        node_x = []
-        node_y = []
-        node_text = []
-        node_colors = []
-        node_sizes = []
 
-        for node in network_nodes:
+        if affected_edge:
 
-            x, y = positions[node]
+            edge_color = "#DC2626"
+            edge_width = 3
+            opacity = 0.95
 
-            node_x.append(x)
-            node_y.append(y)
+        else:
 
-            tier = get_tier(node)
-
-            node_text.append(
-                f"<b>{node}</b><br>"
-                f"Tier: {tier}"
+            edge_color = "#777777"
+            edge_width = 1.25
+            opacity = (
+                0.22
+                if (
+                    highlighted_nodes
+                    or
+                    selected_event_nodes
+                )
+                else 0.60
             )
 
-            # Event source
-            if node in selected_event_nodes:
 
-                node_colors.append(
-                    "#F59E0B"
-                )
+        # Main edge
+        fig.add_trace(
+            go.Scatter(
+                x=[x0, x1],
+                y=[y0, y1],
+                mode="lines",
+                line=dict(
+                    color=edge_color,
+                    width=edge_width
+                ),
+                opacity=opacity,
+                hoverinfo="skip",
+                showlegend=False
+            )
+        )
 
-                node_sizes.append(32)
 
-            # Downstream affected nodes
-            elif node in highlighted_nodes:
+        # Arrow head
+        fig.add_annotation(
+            x=x1,
+            y=y1,
+            ax=x0,
+            ay=y0,
+            xref="x",
+            yref="y",
+            axref="x",
+            ayref="y",
+            text="",
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=1,
+            arrowwidth=edge_width,
+            arrowcolor=edge_color,
+            opacity=opacity
+        )
 
-                node_colors.append(
-                    "#DC2626"
-                )
 
-                node_sizes.append(28)
+    # --------------------------------------------------------
+    # NODE BOXES
+    # --------------------------------------------------------
 
-            # NovaDrive
-            elif node == "NovaDrive Technologies":
+    for node in network_nodes:
 
-                node_colors.append(
-                    "#1F2937"
-                )
+        x, y = positions[node]
 
-                node_sizes.append(36)
+        tier = get_tier(node)
 
-            # Normal node
+        base_color = tier_colors.get(
+            tier,
+            "#E5E7EB"
+        )
+
+
+        # Event source
+        if node in selected_event_nodes:
+
+            fill_color = "#FCA5A5"
+            border_color = "#991B1B"
+            border_width = 4
+            opacity = 1.0
+
+
+        # Downstream affected
+        elif node in highlighted_nodes:
+
+            fill_color = "#F87171"
+            border_color = "#991B1B"
+            border_width = 3
+            opacity = 1.0
+
+
+        # NovaDrive
+        elif node == "NovaDrive Technologies":
+
+            fill_color = "#F1948A"
+            border_color = "#7F1D1D"
+            border_width = 3
+            opacity = 1.0
+
+
+        # Normal
+        else:
+
+            fill_color = base_color
+            border_color = "#666666"
+            border_width = 1.2
+
+            if (
+                highlighted_nodes
+                or
+                selected_event_nodes
+            ):
+
+                opacity = 0.25
+
             else:
 
-                node_colors.append(
-                    "#CBD5E1"
-                )
+                opacity = 1.0
 
-                node_sizes.append(22)
 
-        node_trace = go.Scatter(
-            x=node_x,
-            y=node_y,
-            mode="markers+text",
-            text=[
-                node.replace(
-                    " Ltd.",
-                    ""
-                ).replace(
-                    " Technologies",
-                    ""
-                )
-                for node in network_nodes
-            ],
-            textposition="middle right",
-            textfont=dict(
-                size=10
+        # Approximate rounded-box dimensions
+        box_width = 2.55
+        box_height = 0.72
+
+
+        fig.add_shape(
+            type="rect",
+            x0=x - box_width / 2,
+            x1=x + box_width / 2,
+            y0=y - box_height / 2,
+            y1=y + box_height / 2,
+            fillcolor=fill_color,
+            line=dict(
+                color=border_color,
+                width=border_width
             ),
-            hovertext=node_text,
-            hoverinfo="text",
-            marker=dict(
-                size=node_sizes,
-                color=node_colors,
-                line=dict(
-                    width=1,
-                    color="#374151"
-                )
+            opacity=opacity,
+            layer="above"
+        )
+
+
+        fig.add_annotation(
+            x=x,
+            y=y,
+            text=wrap_label(
+                node,
+                width=19
+            ),
+            showarrow=False,
+            font=dict(
+                size=11.5,
+                color="#1F2937"
+            ),
+            opacity=opacity,
+            align="center",
+            xanchor="center",
+            yanchor="middle"
+        )
+
+
+    # --------------------------------------------------------
+    # TIER HEADINGS
+    # --------------------------------------------------------
+
+    headings = [
+        ("Tier 3", 0),
+        ("Tier 2", 3.4),
+        ("Tier 1", 6.8),
+        ("NovaDrive", 10.2)
+    ]
+
+    for heading, x in headings:
+
+        fig.add_annotation(
+            x=x,
+            y=(
+                max(
+                    [
+                        p[1]
+                        for p in positions.values()
+                    ]
+                ) + 1.25
+            ),
+            text=f"<b>{heading}</b>",
+            showarrow=False,
+            font=dict(
+                size=20,
+                color="#1F2937"
             )
         )
 
-        fig = go.Figure(
-            data=[
-                edge_trace,
-                node_trace
-            ]
+
+    # --------------------------------------------------------
+    # LAYOUT
+    # --------------------------------------------------------
+
+    fig.update_layout(
+
+        height=760,
+
+        margin=dict(
+            l=40,
+            r=40,
+            t=80,
+            b=40
+        ),
+
+        plot_bgcolor="white",
+
+        paper_bgcolor="white",
+
+        xaxis=dict(
+            visible=False,
+            range=[
+                -1.7,
+                11.7
+            ],
+            fixedrange=False
+        ),
+
+        yaxis=dict(
+            visible=False,
+            range=[
+                min(
+                    p[1]
+                    for p in positions.values()
+                ) - 1.2,
+
+                max(
+                    p[1]
+                    for p in positions.values()
+                ) + 1.7
+            ],
+            fixedrange=False
+        ),
+
+        showlegend=False,
+
+        hovermode=False
+    )
+
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={
+            "displayModeBar": True,
+            "scrollZoom": True
+        }
+    )
+
+    if (
+        highlighted_nodes
+        or
+        selected_event_nodes
+    ):
+
+        st.caption(
+            "Highlighted supplier = event source. "
+            "Red nodes and paths = confirmed downstream exposure. "
+            "Faded nodes = not part of the affected path."
         )
 
-        fig.update_layout(
-
-            height=650,
-
-            margin=dict(
-                l=20,
-                r=20,
-                t=30,
-                b=20
-            ),
-
-            xaxis=dict(
-                visible=False,
-                range=[
-                    -0.5,
-                    3.7
-                ]
-            ),
-
-            yaxis=dict(
-                visible=False
-            ),
-
-            plot_bgcolor="white",
-
-            hovermode="closest",
-
-            showlegend=False
-        )
-
-        st.plotly_chart(
-            fig,
-            use_container_width=True,
-            key="network_graph"
-        )
+    else:
 
         st.caption(
             "Tier 3 → Tier 2 → Tier 1 → NovaDrive. "
-            "Orange = event source; red = downstream network exposure."
+            "Use the controls above to investigate the network."
         )
 
-    except ImportError:
 
-        st.error(
-            "Plotly is required for the interactive network graph. "
-            "Add plotly to requirements.txt."
+# ============================================================
+# EXCEL DOWNLOAD
+# ============================================================
+
+def create_network_excel():
+
+    output = BytesIO()
+
+    with pd.ExcelWriter(
+        output,
+        engine="openpyxl"
+    ) as writer:
+
+        supplier_network.to_excel(
+            writer,
+            sheet_name="Confirmed Relationships",
+            index=False
         )
+
+        supplier_entities.to_excel(
+            writer,
+            sheet_name="Supplier Universe",
+            index=False
+        )
+
+        summary = pd.DataFrame(
+            {
+                "Metric": [
+                    "Confirmed relationships",
+                    "Total supplier nodes",
+                    "Tier-1 suppliers",
+                    "Tier-2 suppliers",
+                    "Tier-3 suppliers",
+                    "Total nodes including NovaDrive"
+                ],
+
+                "Count": [
+                    len(supplier_network),
+
+                    len(
+                        supplier_entities
+                    ),
+
+                    len(tier1_nodes),
+
+                    len(tier2_nodes),
+
+                    len(tier3_nodes),
+
+                    len(network_nodes)
+                ]
+            }
+        )
+
+        summary.to_excel(
+            writer,
+            sheet_name="Network Summary",
+            index=False
+        )
+
+
+    output.seek(0)
+
+    return output
 
 
 # ============================================================
 # SIDEBAR
 # ============================================================
 
-st.sidebar.title("NovaDrive CRO")
+st.sidebar.title(
+    "NovaDrive CRO"
+)
 
 st.sidebar.caption(
     "Supplier Network & Risk Intelligence"
@@ -609,7 +1179,7 @@ page = st.sidebar.radio(
 st.sidebar.divider()
 
 st.sidebar.caption(
-    "Confirmed network + event-driven risk"
+    "Current scope: Confirmed network + event-driven risk"
 )
 
 
@@ -619,7 +1189,9 @@ st.sidebar.caption(
 
 if page == "Executive Overview":
 
-    st.title("NovaDrive CRO Dashboard")
+    st.title(
+        "NovaDrive CRO Dashboard"
+    )
 
     st.caption(
         "Supplier network visibility, risk prioritisation "
@@ -627,6 +1199,11 @@ if page == "Executive Overview":
     )
 
     st.divider()
+
+
+    # --------------------------------------------------------
+    # KEY METRICS
+    # --------------------------------------------------------
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -642,10 +1219,7 @@ if page == "Executive Overview":
 
     col3.metric(
         "Tier-1 Suppliers",
-        sum(
-            get_tier(node) == "Tier 1"
-            for node in network_nodes
-        )
+        len(tier1_nodes)
     )
 
     col4.metric(
@@ -653,30 +1227,48 @@ if page == "Executive Overview":
         len(event_alerts)
     )
 
-    st.divider()
-
-    st.subheader("Network Exposure")
-
-    show_network_graph()
 
     st.divider()
 
-    st.subheader("Current Alert Summary")
+
+    # --------------------------------------------------------
+    # NETWORK BREAKDOWN
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Supplier Network"
+    )
 
     col1, col2, col3 = st.columns(3)
 
-    def severity_count(df, severity):
+    col1.metric(
+        "Tier 1",
+        len(tier1_nodes)
+    )
 
-        if "Severity" not in df.columns:
-            return 0
+    col2.metric(
+        "Tier 2",
+        len(tier2_nodes)
+    )
 
-        return int(
-            df["Severity"]
-            .astype(str)
-            .str.upper()
-            .eq(severity.upper())
-            .sum()
-        )
+    col3.metric(
+        "Tier 3",
+        len(tier3_nodes)
+    )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # ALERT SUMMARY
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Current Alert Summary"
+    )
+
+    col1, col2, col3 = st.columns(3)
 
     col1.metric(
         "Critical",
@@ -703,20 +1295,32 @@ if page == "Executive Overview":
     )
 
 
+    st.divider()
+
+    st.info(
+        "Use the navigation panel to investigate supplier "
+        "relationships, risk context and event-driven alerts."
+    )
+
+
 # ============================================================
 # SUPPLIER NETWORK
 # ============================================================
 
 elif page == "Supplier Network":
 
-    st.title("Supplier Network")
-
-    st.caption(
-        "Interactive view of the confirmed material supplier network"
+    st.title(
+        "Supplier Network"
     )
 
+    st.caption(
+        "Interactive reconstruction of the confirmed "
+        "NovaDrive supplier network"
+    )
+
+
     # --------------------------------------------------------
-    # Supplier selector
+    # SUPPLIER SELECTOR
     # --------------------------------------------------------
 
     supplier_options = [
@@ -732,7 +1336,11 @@ elif page == "Supplier Network":
         supplier_options
     )
 
+
     highlighted = set()
+
+    selected_event_nodes = set()
+
 
     if selected_supplier != "None":
 
@@ -744,14 +1352,24 @@ elif page == "Supplier Network":
             selected_supplier
         )
 
+        selected_event_nodes.add(
+            selected_supplier
+        )
+
+
+    # --------------------------------------------------------
+    # GRAPH
+    # --------------------------------------------------------
+
     show_network_graph(
         highlighted_nodes=highlighted,
-        selected_event_nodes=(
-            [selected_supplier]
-            if selected_supplier != "None"
-            else []
-        )
+        selected_event_nodes=selected_event_nodes
     )
+
+
+    # --------------------------------------------------------
+    # SUPPLIER IMPACT
+    # --------------------------------------------------------
 
     if selected_supplier != "None":
 
@@ -761,31 +1379,36 @@ elif page == "Supplier Network":
             f"Supplier Impact — {selected_supplier}"
         )
 
-        st.write(
-            f"**Tier:** {get_tier(selected_supplier)}"
+        col1, col2 = st.columns(2)
+
+        col1.metric(
+            "Tier",
+            get_tier(
+                selected_supplier
+            )
         )
 
-        st.write(
-            f"**Confirmed downstream nodes affected:** "
-            f"{len(highlighted)}"
+        col2.metric(
+            "Downstream Nodes",
+            len(highlighted)
         )
 
-        downstream_display = [
-            node
-            for node in highlighted
-            if node != "NovaDrive Technologies"
-        ]
+
+        downstream_display = sorted(
+            highlighted
+        )
 
         if downstream_display:
 
             st.write(
-                "**Downstream network:**"
+                "**Confirmed downstream network:**"
             )
 
             for node in downstream_display:
 
                 st.write(
-                    f"- {node} ({get_tier(node)})"
+                    f"- {node} "
+                    f"({get_tier(node)})"
                 )
 
         else:
@@ -794,9 +1417,26 @@ elif page == "Supplier Network":
                 "No confirmed downstream dependency identified."
             )
 
+
+    # --------------------------------------------------------
+    # EXCEL
+    # --------------------------------------------------------
+
     st.divider()
 
-    st.subheader("Relationship Evidence")
+    st.subheader(
+        "Network Data"
+    )
+
+    st.download_button(
+        label="Download Network Excel",
+        data=create_network_excel(),
+        file_name="NovaDrive_Point1_Network_Reconstruction.xlsx",
+        mime=(
+            "application/vnd.openxmlformats-officedocument."
+            "spreadsheetml.sheet"
+        )
+    )
 
     st.dataframe(
         supplier_network,
@@ -811,7 +1451,9 @@ elif page == "Supplier Network":
 
 elif page == "Risk Assessment":
 
-    st.title("Risk Assessment")
+    st.title(
+        "Risk Assessment"
+    )
 
     st.caption(
         "Supplier prioritisation and risk context"
@@ -822,6 +1464,25 @@ elif page == "Risk Assessment":
         "supplier network, supplier tiers and event-driven alerts. "
         "The detailed Part 2 risk-scorecard dataset can be connected "
         "here when its final export is added."
+    )
+
+    st.divider()
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric(
+        "Tier 1",
+        len(tier1_nodes)
+    )
+
+    col2.metric(
+        "Tier 2",
+        len(tier2_nodes)
+    )
+
+    col3.metric(
+        "Tier 3",
+        len(tier3_nodes)
     )
 
     st.divider()
@@ -839,16 +1500,15 @@ elif page == "Risk Assessment":
 
 elif page == "Events & Alerts":
 
-    st.title("Events & Alerts")
-
-    st.caption(
-        "Match an external event to the confirmed supplier network "
-        "and visualise its downstream impact"
+    st.title(
+        "Events & Alerts"
     )
 
-    # ========================================================
-    # TABS
-    # ========================================================
+    st.caption(
+        "Match external events to the confirmed network "
+        "and visualise the resulting exposure"
+    )
+
 
     existing_tab, new_tab = st.tabs(
         [
@@ -857,13 +1517,17 @@ elif page == "Events & Alerts":
         ]
     )
 
+
     # ========================================================
-    # EXISTING EVENTS
+    # EXISTING ALERTS
     # ========================================================
 
     with existing_tab:
 
-        st.subheader("Current Management Alerts")
+        st.subheader(
+            "Current Management Alerts"
+        )
+
 
         col1, col2, col3, col4 = st.columns(4)
 
@@ -896,7 +1560,9 @@ elif page == "Events & Alerts":
             )
         )
 
+
         st.divider()
+
 
         if len(event_alerts) > 0:
 
@@ -906,6 +1572,7 @@ elif page == "Events & Alerts":
                 ]
                 .dropna()
                 .astype(str)
+                .unique()
                 .tolist()
             )
 
@@ -914,77 +1581,118 @@ elif page == "Events & Alerts":
                 event_options
             )
 
-            selected_event_row = event_alerts[
-                event_alerts["Event ID"]
-                .astype(str)
-                == selected_event
-            ].iloc[0]
 
             # ------------------------------------------------
-            # Determine affected suppliers
+            # IMPORTANT:
+            # Get ALL alert rows belonging to this event.
+            # EV-001 therefore correctly gives all four
+            # affected suppliers.
             # ------------------------------------------------
+
+            selected_event_rows = event_alerts[
+                event_alerts[
+                    "Event ID"
+                ]
+                .astype(str)
+                ==
+                selected_event
+            ]
+
 
             affected_suppliers = []
 
-            if "Affected Supplier" in selected_event_row.index:
 
-                value = selected_event_row[
+            # ------------------------------------------------
+            # Affected Supplier column
+            # ------------------------------------------------
+
+            if "Affected Supplier" in event_alerts.columns:
+
+                for value in selected_event_rows[
                     "Affected Supplier"
-                ]
+                ].dropna():
 
-                if pd.notna(value):
+                    value_text = normalize_text(
+                        value
+                    )
 
                     for supplier in network_nodes:
 
                         if supplier == "NovaDrive Technologies":
                             continue
 
-                        if normalize_text(supplier) in normalize_text(value):
+                        if normalize_text(
+                            supplier
+                        ) in value_text:
 
-                            affected_suppliers.append(
-                                supplier
+                            if supplier not in affected_suppliers:
+
+                                affected_suppliers.append(
+                                    supplier
+                                )
+
+
+            # ------------------------------------------------
+            # Also run event matcher against event text
+            # ------------------------------------------------
+
+            event_text_parts = []
+
+            for _, row in selected_event_rows.iterrows():
+
+                for field in [
+                    "Title",
+                    "Event Detail"
+                ]:
+
+                    if field in row.index:
+
+                        event_text_parts.append(
+                            str(
+                                row[field]
                             )
+                        )
 
-            # Also search title/detail
+
             event_text = " ".join(
-                [
-                    str(
-                        selected_event_row.get(
-                            "Title",
-                            ""
-                        )
-                    ),
-                    str(
-                        selected_event_row.get(
-                            "Event Detail",
-                            ""
-                        )
-                    )
-                ]
+                event_text_parts
             )
+
 
             matches = match_new_event(
                 event_text
             )
 
+
             for match in matches:
 
-                if match["Supplier"] not in affected_suppliers:
+                supplier = match[
+                    "Supplier"
+                ]
+
+                if supplier not in affected_suppliers:
 
                     affected_suppliers.append(
-                        match["Supplier"]
+                        supplier
                     )
 
-            downstream = get_downstream_nodes(
+
+            # ------------------------------------------------
+            # Downstream impact
+            # ------------------------------------------------
+
+            affected_network = get_downstream_nodes(
                 affected_suppliers
             )
 
-            downstream.discard(
-                *affected_suppliers
+            downstream_only = (
+                affected_network
+                - set(affected_suppliers)
             )
 
+
             # ------------------------------------------------
-            # Graph
+            # GRAPH
             # ------------------------------------------------
 
             st.subheader(
@@ -992,17 +1700,27 @@ elif page == "Events & Alerts":
             )
 
             show_network_graph(
-                highlighted_nodes=downstream,
+                highlighted_nodes=downstream_only,
                 selected_event_nodes=affected_suppliers
             )
 
+
             # ------------------------------------------------
-            # Alert details
+            # ALERT DETAILS
             # ------------------------------------------------
 
             st.subheader(
                 "Management Alert"
             )
+
+
+            # Display the first alert row as the primary
+            # management alert.
+
+            selected_row = (
+                selected_event_rows.iloc[0]
+            )
+
 
             priority_fields = [
                 "Event ID",
@@ -1018,17 +1736,23 @@ elif page == "Events & Alerts":
                 "Next Action"
             ]
 
+
             for field in priority_fields:
 
-                if field in selected_event_row.index:
+                if field in selected_row.index:
 
-                    value = selected_event_row[field]
+                    value = selected_row[field]
 
                     if pd.notna(value):
 
                         st.markdown(
                             f"**{field}:** {value}"
                         )
+
+
+            # ------------------------------------------------
+            # AFFECTED NETWORK
+            # ------------------------------------------------
 
             if affected_suppliers:
 
@@ -1038,28 +1762,33 @@ elif page == "Events & Alerts":
                     "Affected Confirmed Network"
                 )
 
+
                 for supplier in affected_suppliers:
 
                     st.write(
-                        f"🔴 **{supplier}** — "
+                        f"🟠 **{supplier}** — "
                         f"{get_tier(supplier)}"
                     )
 
-                for node in downstream:
+
+                for node in sorted(
+                    downstream_only
+                ):
 
                     st.write(
                         f"🔴 {node} — "
                         f"{get_tier(node)}"
                     )
 
+
             else:
 
                 st.info(
                     "No confirmed supplier node was identified "
-                    "from this event. Treat as an external exposure "
-                    "requiring verification rather than inventing "
-                    "a network relationship."
+                    "from this event. Treat this as an external "
+                    "exposure requiring verification."
                 )
+
 
         st.divider()
 
@@ -1073,6 +1802,7 @@ elif page == "Events & Alerts":
             hide_index=True
         )
 
+
     # ========================================================
     # NEW EVENT
     # ========================================================
@@ -1085,9 +1815,10 @@ elif page == "Events & Alerts":
 
         st.write(
             "Enter an external risk signal in plain language. "
-            "The platform will attempt to match it to a confirmed "
-            "supplier or production facility."
+            "The platform will match it against confirmed "
+            "supplier names, facilities and network geographies."
         )
+
 
         new_event = st.text_area(
             "Event description",
@@ -1095,13 +1826,15 @@ elif page == "Events & Alerts":
                 "Example: Fire reported at SITE-081 "
                 "affecting production..."
             ),
-            height=140
+            height=150
         )
+
 
         analyze = st.button(
             "Analyze Event",
             type="primary"
         )
+
 
         if analyze:
 
@@ -1117,20 +1850,21 @@ elif page == "Events & Alerts":
                     new_event
                 )
 
+
                 if not matches:
 
                     st.warning(
-                        "No confirmed supplier or facility match "
-                        "was identified."
+                        "No confirmed supplier, facility or "
+                        "network geography was identified."
                     )
 
                     st.info(
                         "This should be treated as an "
                         "**Unassessed External Exposure**. "
-                        "The platform deliberately does not create "
-                        "a supplier relationship from an ambiguous "
-                        "event."
+                        "The platform deliberately does not "
+                        "invent a supplier relationship."
                     )
+
 
                 else:
 
@@ -1143,39 +1877,43 @@ elif page == "Events & Alerts":
                         )
                     )
 
+
                     affected_network = (
                         get_downstream_nodes(
                             matched_suppliers
                         )
                     )
 
+
                     downstream_only = (
                         affected_network
                         - set(matched_suppliers)
                     )
+
+
+                    # ----------------------------------------
+                    # MATCH
+                    # ----------------------------------------
 
                     st.success(
                         f"Matched {len(matched_suppliers)} "
                         f"confirmed supplier node(s)."
                     )
 
-                    # ----------------------------------------
-                    # MATCH DETAILS
-                    # ----------------------------------------
 
                     st.subheader(
                         "Event Match"
                     )
 
-                    match_table = pd.DataFrame(
-                        matches
-                    )
 
                     st.dataframe(
-                        match_table,
+                        pd.DataFrame(
+                            matches
+                        ),
                         use_container_width=True,
                         hide_index=True
                     )
+
 
                     # ----------------------------------------
                     # NETWORK GRAPH
@@ -1185,50 +1923,66 @@ elif page == "Events & Alerts":
                         "Network Impact"
                     )
 
+
                     show_network_graph(
                         highlighted_nodes=downstream_only,
                         selected_event_nodes=matched_suppliers
                     )
 
+
                     # ----------------------------------------
-                    # IMPACT SUMMARY
+                    # SUMMARY
                     # ----------------------------------------
 
                     st.subheader(
                         "Impact Summary"
                     )
 
+
                     col1, col2, col3 = st.columns(3)
 
+
                     col1.metric(
-                        "Event-Affected Supplier Nodes",
-                        len(matched_suppliers)
+                        "Directly Matched Nodes",
+                        len(
+                            matched_suppliers
+                        )
                     )
+
 
                     col2.metric(
                         "Downstream Nodes Exposed",
-                        len(downstream_only)
+                        len(
+                            downstream_only
+                        )
                     )
+
 
                     col3.metric(
                         "NovaDrive Exposure",
                         (
                             "Yes"
-                            if "NovaDrive Technologies"
+                            if
+                            "NovaDrive Technologies"
                             in affected_network
-                            else "No"
+                            else
+                            "No"
                         )
                     )
 
+
                     st.divider()
+
 
                     st.subheader(
                         "Affected Network"
                     )
 
+
                     st.write(
                         "**Directly matched supplier(s):**"
                     )
+
 
                     for supplier in matched_suppliers:
 
@@ -1236,6 +1990,7 @@ elif page == "Events & Alerts":
                             f"🟠 **{supplier}** "
                             f"({get_tier(supplier)})"
                         )
+
 
                     if downstream_only:
 
@@ -1259,32 +2014,40 @@ elif page == "Events & Alerts":
                             "was identified."
                         )
 
+
+                    # ----------------------------------------
+                    # MANAGEMENT INTERPRETATION
+                    # ----------------------------------------
+
                     st.divider()
 
                     st.subheader(
                         "Management Interpretation"
                     )
 
-                    if "NovaDrive Technologies" in affected_network:
+
+                    if (
+                        "NovaDrive Technologies"
+                        in affected_network
+                    ):
 
                         st.error(
-                            "The matched supplier sits on a confirmed "
-                            "path to NovaDrive. The event therefore has "
-                            "potential direct network relevance."
+                            "The matched supplier sits on a "
+                            "confirmed path to NovaDrive. "
+                            "The event therefore has potential "
+                            "direct network relevance."
                         )
+
 
                         st.markdown(
                             """
-                            **Recommended next action**
+**Recommended next action**
 
-                            1. Verify whether the event has caused
-                               an actual production or shipment impact.
-                            2. Check affected facility / material
-                               availability.
-                            3. Assess inventory and time-to-impact.
-                            4. Initiate alternate-supplier review if
-                               the exposure is material.
-                            """
+1. Verify whether the event caused an actual production or shipment impact.
+2. Check affected facility / material availability.
+3. Assess inventory and time-to-impact.
+4. Initiate alternate-supplier review if the exposure is material.
+"""
                         )
 
                     else:
@@ -1302,7 +2065,9 @@ elif page == "Events & Alerts":
 
 elif page == "Alternate Suppliers":
 
-    st.title("Alternate Suppliers")
+    st.title(
+        "Alternate Suppliers"
+    )
 
     st.caption(
         "Alternate supplier discovery and fitment assessment"
@@ -1317,13 +2082,13 @@ elif page == "Alternate Suppliers":
 
     st.markdown(
         """
-        **Planned functionality**
+**Planned functionality**
 
-        - Search alternatives for an affected component
-        - Show technical/application relevance
-        - Show manufacturing footprint and industry presence
-        - Display public evidence and source/date
-        - Separate supplier fitment from supplier risk
-        - Identify qualification or engineering validation required
-        """
+- Search alternatives for an affected component
+- Show technical/application relevance
+- Show manufacturing footprint and industry presence
+- Display public evidence and source/date
+- Separate supplier fitment from supplier risk
+- Identify qualification or engineering validation required
+"""
     )
