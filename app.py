@@ -2286,41 +2286,41 @@ the available dimensions are reweighted where required.
 
     st.markdown(
         f"""
+    <div style="
+        background:{background};
+        border-left:7px solid {color};
+        padding:18px 22px;
+        border-radius:8px;
+        margin:10px 0 20px 0;
+    ">
         <div style="
-            background:{background};
-            border-left:7px solid {color};
-            padding:18px 22px;
-            border-radius:8px;
-            margin:10px 0 20px 0;
+            color:#94A3B8;
+            font-size:14px;
         ">
-            <div style="
-                color:#94A3B8;
-                font-size:14px;
-            ">
-                {selected_risk_supplier}
-                &nbsp; | &nbsp;
-                {selected_row["Tier"]}
-            </div>
-
-            <div style="
-                color:{color};
-                font-size:30px;
-                font-weight:800;
-                margin-top:5px;
-            ">
-                {risk_level}
-            </div>
-
-            <div style="
-                color:#E5E7EB;
-                font-size:17px;
-                margin-top:5px;
-            ">
-                Composite Risk Score:
-                <b>{selected_row["Composite_Risk_Score"]:.1f}</b>
-            </div>
+            {selected_risk_supplier}
+            &nbsp; | &nbsp;
+            {selected_row["Tier"]}
         </div>
-        """,
+    
+        <div style="
+            color:{color};
+            font-size:30px;
+            font-weight:800;
+            margin-top:5px;
+        ">
+            {risk_level}
+        </div>
+    
+        <div style="
+            color:#E5E7EB;
+            font-size:17px;
+            margin-top:5px;
+        ">
+            Composite Risk Score:
+            <b>{selected_row["Composite_Risk_Score"]:.1f}</b>
+        </div>
+    </div>
+    """,
         unsafe_allow_html=True
     )
 
