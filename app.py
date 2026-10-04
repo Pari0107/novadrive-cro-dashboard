@@ -2542,39 +2542,37 @@ elif page == "Events & Alerts":
         # EXAMPLE CASES
         # ----------------------------------------------------
 
-        with st.expander(
-            "Try these example cases"
-        ):
-
-            st.write(
-                "These examples can be copied into the box below "
-                "to test different network-impact scenarios."
-            )
-
-
-            for title, example in EXAMPLE_EVENTS:
-
-                st.markdown(
-                    f"**{title}**"
-                )
-
-                st.code(
-                    example,
-                    language=None
-                )
+        st.markdown("### Try an example")
+        
+        # Store the selected example in session state
+        if "new_event_input" not in st.session_state:
+            st.session_state["new_event_input"] = ""
+        
+        # Display the examples as clickable boxes
+        cols = st.columns(2)
+        
+        for i, (label, description) in enumerate(EXAMPLE_EVENTS):
+        
+            with cols[i % 2]:
+        
+                if st.button(
+                    label,
+                    key=f"example_event_{i}",
+                    use_container_width=True
+                ):
+                    st.session_state["new_event_input"] = description
+                    st.rerun()
 
 
         # ----------------------------------------------------
         # INPUT
         # ----------------------------------------------------
 
-        new_event = st.text_area(
+        event_text = st.text_area(
             "Event description",
-            placeholder=(
-                "Example: Fire reported at SITE-081 "
-                "affecting production..."
-            ),
-            height=150
+            key="new_event_input",
+            height=130,
+            placeholder="Describe an external event..."
         )
 
 
