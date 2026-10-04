@@ -995,23 +995,16 @@ def show_network_graph(
         # is being investigated, unless the relationship itself
         # touches the selected/affected network.
     
-        uncertainty_active = (
-            source in highlighted_nodes
-            or source in selected_event_nodes
-            or target in highlighted_nodes
-            or target in selected_event_nodes
-        )
-    
+        # Uncertainty relationships are kept separate from the
+        # confirmed event-impact path. When an event/supplier is
+        # selected, fade the entire uncertainty layer.
+        
         if highlighted_nodes or selected_event_nodes:
-    
-            uncertainty_opacity = (
-                0.9
-                if uncertainty_active
-                else 0.12
-            )
-    
+        
+            uncertainty_opacity = 0.12
+        
         else:
-    
+        
             uncertainty_opacity = 0.9
     
     
