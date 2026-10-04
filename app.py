@@ -274,7 +274,7 @@ EXAMPLE_EVENTS = [
     ),
 
     (
-        "No network match",
+        "Westport — unrelated event",
         "A fire at a manufacturing facility in Westport has "
         "temporarily halted production of industrial sensors."
     )
