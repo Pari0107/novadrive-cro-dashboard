@@ -2350,62 +2350,6 @@ the available dimensions are reweighted where required.
         f'{selected_row["Evidence_Confidence (%)"]:.1f}%'
     )
 
-    # --------------------------------------------------------
-    # UNDERLYING INDICATORS
-    # --------------------------------------------------------
-
-    with st.expander(
-        "View underlying risk indicators"
-    ):
-
-        indicator_cols = [
-            "Current Ratio",
-            "Net Debt / EBITDA",
-            "Shipment Timeliness - 3M Avg (%)",
-            "Timeliness Change - Jan To Latest (pp)",
-            "Assurance Gap Index",
-            "Physical Hazard Index",
-            "Logistics Friction Index",
-            "Infrastructure Index"
-        ]
-
-        indicator_data = {
-            "Indicator": [],
-            "Value": []
-        }
-
-        for col in indicator_cols:
-
-            if col in selected_row.index:
-
-                indicator_data["Indicator"].append(
-                    col
-                )
-
-                value = selected_row[col]
-
-                if pd.isna(value):
-
-                    value = "Not available"
-
-                else:
-
-                    value = round(
-                        float(value),
-                        2
-                    )
-
-                indicator_data["Value"].append(
-                    value
-                )
-
-        st.dataframe(
-            pd.DataFrame(indicator_data),
-            use_container_width=True,
-            hide_index=True
-        )
-
-
 # ============================================================
 # EVENTS & ALERTS
 # ============================================================
