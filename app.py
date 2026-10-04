@@ -1263,15 +1263,14 @@ def show_network_graph(
 
     fig.update_layout(
 
-        height=850,
+    height=1000,
 
-        margin=dict(
-            l=40,
-            r=40,
-            t=80,
-            b=40
-        ),
-
+    margin=dict(
+        l=60,
+        r=60,
+        t=120,
+        b=100
+    ),
         plot_bgcolor="white",
 
         paper_bgcolor="white",
