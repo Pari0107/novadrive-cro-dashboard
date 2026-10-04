@@ -1305,9 +1305,12 @@ def show_network_graph(
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1
+            x=1,
+            font=dict(
+                color="#1F2937",
+                size=13
+            )
         ),
-
         hovermode=False
     )
 
