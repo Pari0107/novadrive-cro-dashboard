@@ -1089,17 +1089,24 @@ def show_network_graph(
         # ----------------------------------------------------
         # Uncertainty node
         # ----------------------------------------------------
-
+        
         elif node in [
             "Verdant Process Gases Ltd.",
             "Alder Bauxite Ltd.",
             "Solace Optics"
         ]:
-
+        
             fill_color = "#F3F4F6"
             border_color = "#E67E22"
             border_width = 2
-            opacity = 0.75
+        
+            if (
+                highlighted_nodes
+                or selected_event_nodes
+            ):
+                opacity = 0.18
+            else:
+                opacity = 0.75
 
 
         # ----------------------------------------------------
