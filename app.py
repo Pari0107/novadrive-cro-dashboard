@@ -96,63 +96,23 @@ network_nodes = set()
 for _, row in supplier_network.iterrows():
 
     if pd.notna(row.get("From")):
-        network_nodes.add(str(row["From"]))
+        network_nodes.add(
+            str(row["From"])
+        )
 
     if pd.notna(row.get("To")):
-        network_nodes.add(str(row["To"]))
-
+        network_nodes.add(
+            str(row["To"])
+        )
 
 network_nodes.add(
     "NovaDrive Technologies"
 )
 
-
-# ============================================================
-# UNCERTAINTY LAYER FROM PART 1
-# ============================================================
-
-uncertainty_edges = [
-
-    {
-        "From": "Verdant Process Gases Ltd.",
-        "To": "IonPeak Semiconductor Ltd.",
-        "Status": "Reasonable inference",
-        "Confidence": "Medium"
-    },
-
-    {
-        "From": "Alder Bauxite Ltd.",
-        "To": "Quartz Alloy Ltd.",
-        "Status": "Unresolved hypothesis",
-        "Confidence": "Low"
-    },
-
-    {
-        "From": "Solace Optics",
-        "To": "Grove Battery Controls Ltd.",
-        "Status": "Unresolved hypothesis",
-        "Confidence": "Low-Medium"
-    }
-]
-
-
-# Add uncertainty-only nodes to the visual network.
-# They are NOT treated as confirmed suppliers.
-
-for edge in uncertainty_edges:
-
-    network_nodes.add(edge["From"])
-    network_nodes.add(edge["To"])
-
-
 network_nodes = sorted(
     network_nodes
 )
 
-
-# ============================================================
-# CONFIRMED EDGES
-# ============================================================
 
 network_edges = []
 
