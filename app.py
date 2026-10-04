@@ -971,26 +971,50 @@ def show_network_graph(
         )
 
 
+
     # ========================================================
     # UNCERTAINTY / HYPOTHESIS EDGES
     # ========================================================
-
+    
     for edge in uncertainty_edges:
-
+    
         source = edge["From"]
         target = edge["To"]
-
+    
         start_x, start_y = boundary_point(
             source,
             target
         )
-
+    
         end_x, end_y = boundary_point(
             target,
             source
         )
-
-
+    
+        # Fade uncertainty relationships when a supplier/event
+        # is being investigated, unless the relationship itself
+        # touches the selected/affected network.
+    
+        uncertainty_active = (
+            source in highlighted_nodes
+            or source in selected_event_nodes
+            or target in highlighted_nodes
+            or target in selected_event_nodes
+        )
+    
+        if highlighted_nodes or selected_event_nodes:
+    
+            uncertainty_opacity = (
+                0.9
+                if uncertainty_active
+                else 0.12
+            )
+    
+        else:
+    
+            uncertainty_opacity = 0.9
+    
+    
         fig.add_trace(
             go.Scatter(
                 x=[
@@ -1007,14 +1031,14 @@ def show_network_graph(
                     width=2,
                     dash="dash"
                 ),
-                opacity=0.9,
+                opacity=uncertainty_opacity,
                 hoverinfo="text",
                 text=edge["Status"],
                 showlegend=False
             )
         )
-
-
+    
+    
         fig.add_annotation(
             x=end_x,
             y=end_y,
@@ -1030,10 +1054,8 @@ def show_network_graph(
             arrowsize=1,
             arrowwidth=2,
             arrowcolor=edge["Color"],
-            opacity=0.9
+            opacity=uncertainty_opacity
         )
-
-
     # ========================================================
     # NODE BOXES
     # ========================================================
