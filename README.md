@@ -8,8 +8,6 @@ The NovaDrive CRO Dashboard is a decision-support platform designed to provide v
 
 The dashboard integrates supplier network reconstruction, supplier risk assessment, external event monitoring and alternate supplier discovery into a single interactive platform.
 
----
-
 ## Key Capabilities
 
 ### 1. Supplier Network Reconstruction
@@ -24,8 +22,6 @@ Key capabilities include:
 - Downstream dependency analysis
 - Separation of confirmed relationships from uncertain relationships
 - Evidence-backed network reconstruction
-
----
 
 ### 2. Supplier Risk Assessment
 
@@ -48,8 +44,6 @@ Risk categories are defined as:
 - **Low:** < 45
 
 Evidence confidence is reported separately from supplier risk so that uncertainty in available information is not automatically treated as low risk.
-
----
 
 ### 3. Event Risk Intelligence
 
