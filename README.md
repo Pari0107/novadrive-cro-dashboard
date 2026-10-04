@@ -83,42 +83,20 @@ Supplier risk is kept separate from alternate-supplier fitment.
 
 ## Data & Files
 
-### `Samanvay_Consularium_NovaDrive_Data.xlsx`
-
-The main case workbook containing six source sheets:
-
-| Sheet | Contents |
-|---|---|
-| **Business Context** | Product revenue, volumes and manufacturing footprint |
-| **Component Context** | Component descriptions, product usage and screening context |
-| **Supplier Universe** | Candidate organisations, capabilities and facilities |
-| **Relationship Evidence** | Evidence used to reconstruct supplier relationships |
-| **Risk Indicators** | Financial, operational and location indicators |
-| **Event Feed** | Simulated external-risk signals for event analysis |
-
-### `consularium.ipynb`
-
-The Google Colab notebook containing the analytical workflow for Parts 1–4, including network reconstruction, risk scoring, event matching and alternate supplier discovery. It serves as the analytical record behind the dashboard outputs.
-
-### `supplier_network.csv`
-
-Confirmed supplier relationships used for the interactive network.
-
-### `supplier_entities.csv`
-
-Confirmed supplier entities and facility information used by the dashboard.
-
 ### `event_alerts.csv`
-
-Processed event assessments and management alerts from Part 3.
+Contains the processed event-risk outputs used for management alerts. It records the `Event ID`, `Title`, `Affected Supplier`, `Severity`, `Risk Level`, `Evidence Confidence`, `Geography`, `Facility`, `Why It Matters`, `Network Context` and `Next Action`. Multiple rows may represent different supplier impacts from the same event.
 
 ### `novadrive_supplier_risk_scorecard.csv`
+Contains the Part 2 supplier risk assessment for confirmed suppliers. It includes `Entity ID`, `Legal Name`, `Tier`, `Composite_Risk_Score`, `Risk_Category`, `Financial_Risk_Score`, `Operational_Risk_Score`, `Geo_Risk_Score`, `Network_Exposure_Score` and `Evidence_Confidence (%)`.
 
-Final Part 2 supplier risk scorecard used by the Risk Assessment section.
+### `supplier_entities.csv`
+Contains the confirmed supplier reference table with `Entity`, `Tier` and `Match Key`. It supports supplier identification, tier mapping and event matching.
 
-### `novadrive_web_alternate_suppliers.csv`
+### `supplier_network.csv`
+Contains the confirmed supplier relationships used to construct the network. Columns include `Evidence ID`, `From`, `To`, `Evidence Role`, `NovaDrive Component`, `Program`, `Supplied Input`, `Facility` and `From Tier`.
 
-Part 4 alternate supplier candidates and their initial public-source fitment assessment.
+### `consularium.ipynb`
+The Google Colab notebook contains the complete analytical workflow behind the dashboard. It covers supplier network reconstruction and tiering, uncertainty analysis, supplier risk scoring, event matching and validation, network impact analysis, management alert generation, and alternate supplier discovery. It serves as the analytical record from which the dashboard outputs are generated.
 
 ## How to Run
 
