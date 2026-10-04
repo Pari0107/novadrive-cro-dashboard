@@ -2584,7 +2584,7 @@ elif page == "Events & Alerts":
 
         if analyze:
 
-            if not new_event.strip():
+            if not event_text.strip():
 
                 st.warning(
                     "Please enter an event description."
@@ -2593,7 +2593,7 @@ elif page == "Events & Alerts":
             else:
 
                 matches = match_new_event(
-                    new_event
+                    event_text
                 )
 
 
