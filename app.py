@@ -2234,7 +2234,7 @@ elif page == "Events & Alerts":
         with col1:
 
             show_risk_badge(
-                "Event Risk Level",
+                "Management Alert Risk",
                 event_risk
             )
 
