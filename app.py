@@ -39,7 +39,7 @@ def load_data():
 
     # Part 2 supplier risk scorecard
     supplier_risk = pd.read_csv(
-        "data/supplier_risk_scorecard.csv"
+        "data/novadrive_supplier_risk_scorecard.csv"
     )
 
     return (
