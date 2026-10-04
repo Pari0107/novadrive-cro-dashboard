@@ -1860,39 +1860,6 @@ if page == "Executive Overview":
     )
 
 
-    st.divider()
-
-
-    st.subheader(
-        "Current Alert Summary"
-    )
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "Critical",
-        severity_count(
-            event_alerts,
-            "CRITICAL"
-        )
-    )
-
-    col2.metric(
-        "High",
-        severity_count(
-            event_alerts,
-            "HIGH"
-        )
-    )
-
-    col3.metric(
-        "Medium",
-        severity_count(
-            event_alerts,
-            "MEDIUM"
-        )
-    )
-
 
     st.divider()
 
