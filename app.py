@@ -37,14 +37,20 @@ def load_data():
         "data/event_alerts.csv"
     )
 
+    # Part 2 supplier risk scorecard
+    supplier_risk = pd.read_csv(
+        "data/supplier_risk_scorecard.csv"
+    )
+
     return (
         supplier_network,
         supplier_entities,
-        event_alerts
+        event_alerts,
+        supplier_risk
     )
 
 
-supplier_network, supplier_entities, event_alerts = load_data()
+supplier_network, supplier_entities, event_alerts, supplier_risk = load_data()
 
 
 # ============================================================
@@ -2036,45 +2042,393 @@ elif page == "Risk Assessment":
     )
 
     st.caption(
-        "Supplier prioritisation and risk context"
+        "Supplier risk prioritisation based on the Part 2 "
+        "risk scorecard"
     )
 
-    st.info(
-        "The current dashboard dataset contains the confirmed "
-        "supplier network, supplier tiers and event-driven alerts. "
-        "The detailed Part 2 risk-scorecard dataset can be connected "
-        "here when its final export is added."
-    )
 
-    st.divider()
+    # --------------------------------------------------------
+    # CONFIRMED NETWORK ONLY
+    # --------------------------------------------------------
+
+    excluded_risk_entities = [
+        "Verdant Process Gases Ltd.",
+        "Solace Optics Ltd."
+    ]
+
+    risk_df = supplier_risk[
+        ~supplier_risk["Legal Name"].isin(
+            excluded_risk_entities
+        )
+    ].copy()
 
 
-    col1, col2, col3 = st.columns(3)
+    # --------------------------------------------------------
+    # KEY METRICS
+    # --------------------------------------------------------
+
+    col1, col2, col3, col4 = st.columns(4)
 
     col1.metric(
-        "Tier 1",
-        len(tier1_nodes)
+        "Suppliers Assessed",
+        len(risk_df)
     )
 
     col2.metric(
-        "Tier 2",
-        len(tier2_nodes)
+        "Critical",
+        int(
+            (
+                risk_df["Risk_Category"]
+                .astype(str)
+                .str.upper()
+                == "CRITICAL"
+            ).sum()
+        )
     )
 
     col3.metric(
-        "Tier 3",
-        len(tier3_nodes)
+        "High",
+        int(
+            (
+                risk_df["Risk_Category"]
+                .astype(str)
+                .str.upper()
+                == "HIGH"
+            ).sum()
+        )
+    )
+
+    col4.metric(
+        "Medium",
+        int(
+            (
+                risk_df["Risk_Category"]
+                .astype(str)
+                .str.upper()
+                == "MEDIUM"
+            ).sum()
+        )
     )
 
 
     st.divider()
 
 
+    # --------------------------------------------------------
+    # RISK METHODOLOGY
+    # --------------------------------------------------------
+
+    with st.expander(
+        "How is supplier risk calculated?"
+    ):
+
+        st.markdown(
+            """
+### Composite Risk Score
+
+The supplier risk score combines four dimensions:
+
+- **30% — Network Exposure**
+- **25% — Financial Risk**
+- **25% — Operational Risk**
+- **20% — Geographic / External Risk**
+
+Each dimension is converted to a 0–100 risk score.
+
+**Higher score = higher supplier risk.**
+
+Evidence confidence is reported separately from risk. Missing
+financial information is not automatically treated as low risk;
+the available dimensions are reweighted where required.
+
+### Risk Categories
+
+| Composite Score | Risk Category |
+|---:|---|
+| ≥ 70 | 🔴 Critical |
+| 55–69.99 | 🟠 High |
+| 45–54.99 | 🟡 Medium |
+| < 45 | 🟢 Low |
+"""
+        )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # RISK PRIORITY TABLE
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Supplier Risk Priority"
+    )
+
+    display_cols = [
+        "Legal Name",
+        "Tier",
+        "Composite_Risk_Score",
+        "Risk_Category",
+        "Financial_Risk_Score",
+        "Operational_Risk_Score",
+        "Geo_Risk_Score",
+        "Network_Exposure_Score",
+        "Evidence_Confidence (%)"
+    ]
+
+    display_df = risk_df[
+        display_cols
+    ].copy()
+
+    display_df = display_df.sort_values(
+        "Composite_Risk_Score",
+        ascending=False
+    )
+
+    display_df["Composite_Risk_Score"] = (
+        display_df["Composite_Risk_Score"]
+        .round(1)
+    )
+
+    display_df["Financial_Risk_Score"] = (
+        display_df["Financial_Risk_Score"]
+        .round(1)
+    )
+
+    display_df["Operational_Risk_Score"] = (
+        display_df["Operational_Risk_Score"]
+        .round(1)
+    )
+
+    display_df["Geo_Risk_Score"] = (
+        display_df["Geo_Risk_Score"]
+        .round(1)
+    )
+
+    display_df["Network_Exposure_Score"] = (
+        display_df["Network_Exposure_Score"]
+        .round(1)
+    )
+
+    display_df["Evidence_Confidence (%)"] = (
+        display_df["Evidence_Confidence (%)"]
+        .round(1)
+    )
+
+
     st.dataframe(
-        supplier_entities,
+        display_df,
         use_container_width=True,
         hide_index=True
     )
+
+
+    st.divider()
+
+
+    # --------------------------------------------------------
+    # SUPPLIER DETAIL
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Inspect Supplier Risk"
+    )
+
+    supplier_options = (
+        risk_df["Legal Name"]
+        .sort_values()
+        .tolist()
+    )
+
+    selected_risk_supplier = st.selectbox(
+        "Select a supplier",
+        supplier_options
+    )
+
+    selected_row = risk_df[
+        risk_df["Legal Name"]
+        == selected_risk_supplier
+    ].iloc[0]
+
+
+    # --------------------------------------------------------
+    # RISK HEADER
+    # --------------------------------------------------------
+
+    risk_level = str(
+        selected_row["Risk_Category"]
+    ).upper()
+
+    risk_colors = {
+        "CRITICAL": "#B91C1C",
+        "HIGH": "#EA580C",
+        "MEDIUM": "#D97706",
+        "LOW": "#16A34A"
+    }
+
+    risk_backgrounds = {
+        "CRITICAL": "#2A1115",
+        "HIGH": "#281916",
+        "MEDIUM": "#241C14",
+        "LOW": "#0D211B"
+    }
+
+    color = risk_colors.get(
+        risk_level,
+        "#6B7280"
+    )
+
+    background = risk_backgrounds.get(
+        risk_level,
+        "#1F2937"
+    )
+
+
+    st.markdown(
+        f"""
+        <div style="
+            background:{background};
+            border-left:7px solid {color};
+            padding:18px 22px;
+            border-radius:8px;
+            margin:10px 0 20px 0;
+        ">
+            <div style="
+                color:#94A3B8;
+                font-size:14px;
+            ">
+                {selected_risk_supplier}
+                &nbsp; | &nbsp;
+                {selected_row["Tier"]}
+            </div>
+
+            <div style="
+                color:{color};
+                font-size:30px;
+                font-weight:800;
+                margin-top:5px;
+            ">
+                {risk_level}
+            </div>
+
+            <div style="
+                color:#E5E7EB;
+                font-size:17px;
+                margin-top:5px;
+            ">
+                Composite Risk Score:
+                <b>{selected_row["Composite_Risk_Score"]:.1f}</b>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+    # --------------------------------------------------------
+    # COMPONENT RISK SCORES
+    # --------------------------------------------------------
+
+    st.markdown(
+        "**Risk Dimension Breakdown**"
+    )
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric(
+        "Network Exposure",
+        f'{selected_row["Network_Exposure_Score"]:.1f}'
+    )
+
+    col2.metric(
+        "Financial Risk",
+        (
+            "Not available"
+            if pd.isna(
+                selected_row["Financial_Risk_Score"]
+            )
+            else
+            f'{selected_row["Financial_Risk_Score"]:.1f}'
+        )
+    )
+
+    col3.metric(
+        "Operational Risk",
+        f'{selected_row["Operational_Risk_Score"]:.1f}'
+    )
+
+    col4.metric(
+        "Geographic Risk",
+        f'{selected_row["Geo_Risk_Score"]:.1f}'
+    )
+
+
+    # --------------------------------------------------------
+    # EVIDENCE CONFIDENCE
+    # --------------------------------------------------------
+
+    st.markdown(
+        f"""
+**Evidence Confidence:** 
+{selected_row["Evidence_Confidence (%)"]:.1f}%
+"""
+    )
+
+
+    # --------------------------------------------------------
+    # UNDERLYING INDICATORS
+    # --------------------------------------------------------
+
+    with st.expander(
+        "View underlying risk indicators"
+    ):
+
+        indicator_cols = [
+            "Current Ratio",
+            "Net Debt / EBITDA",
+            "Shipment Timeliness - 3M Avg (%)",
+            "Timeliness Change - Jan To Latest (pp)",
+            "Assurance Gap Index",
+            "Physical Hazard Index",
+            "Logistics Friction Index",
+            "Infrastructure Index"
+        ]
+
+        indicator_data = {
+            "Indicator": [],
+            "Value": []
+        }
+
+        for col in indicator_cols:
+
+            if col in selected_row.index:
+
+                indicator_data["Indicator"].append(
+                    col
+                )
+
+                value = selected_row[col]
+
+                if pd.isna(value):
+
+                    value = "Not available"
+
+                else:
+
+                    value = round(
+                        float(value),
+                        2
+                    )
+
+                indicator_data["Value"].append(
+                    value
+                )
+
+        st.dataframe(
+            pd.DataFrame(indicator_data),
+            use_container_width=True,
+            hide_index=True
+        )
 
 
 # ============================================================
