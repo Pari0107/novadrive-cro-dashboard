@@ -2255,91 +2255,69 @@ the available dimensions are reweighted where required.
     # RISK HEADER
     # --------------------------------------------------------
 
+    # --------------------------------------------------------
+    # RISK SUMMARY
+    # --------------------------------------------------------
+    
     risk_level = str(
         selected_row["Risk_Category"]
     ).upper()
-
-    risk_colors = {
-        "CRITICAL": "#B91C1C",
-        "HIGH": "#EA580C",
-        "MEDIUM": "#D97706",
-        "LOW": "#16A34A"
-    }
-
-    risk_backgrounds = {
-        "CRITICAL": "#2A1115",
-        "HIGH": "#281916",
-        "MEDIUM": "#241C14",
-        "LOW": "#0D211B"
-    }
-
-    color = risk_colors.get(
-        risk_level,
-        "#6B7280"
-    )
-
-    background = risk_backgrounds.get(
-        risk_level,
-        "#1F2937"
-    )
-
-
-    st.markdown(
-        f"""
-    <div style="
-        background:{background};
-        border-left:7px solid {color};
-        padding:18px 22px;
-        border-radius:8px;
-        margin:10px 0 20px 0;
-    ">
-        <div style="
-            color:#94A3B8;
-            font-size:14px;
-        ">
-            {selected_risk_supplier}
-            &nbsp; | &nbsp;
-            {selected_row["Tier"]}
-        </div>
     
-        <div style="
-            color:{color};
-            font-size:30px;
-            font-weight:800;
-            margin-top:5px;
-        ">
-            {risk_level}
-        </div>
     
-        <div style="
-            color:#E5E7EB;
-            font-size:17px;
-            margin-top:5px;
-        ">
-            Composite Risk Score:
-            <b>{selected_row["Composite_Risk_Score"]:.1f}</b>
-        </div>
-    </div>
-    """,
-        unsafe_allow_html=True
+    if risk_level == "CRITICAL":
+    
+        st.error(
+            f"🔴 **CRITICAL RISK**  |  "
+            f"{selected_risk_supplier}  |  "
+            f"{selected_row['Tier']}"
+        )
+    
+    elif risk_level == "HIGH":
+    
+        st.warning(
+            f"🟠 **HIGH RISK**  |  "
+            f"{selected_risk_supplier}  |  "
+            f"{selected_row['Tier']}"
+        )
+    
+    elif risk_level == "MEDIUM":
+    
+        st.warning(
+            f"🟡 **MEDIUM RISK**  |  "
+            f"{selected_risk_supplier}  |  "
+            f"{selected_row['Tier']}"
+        )
+    
+    else:
+    
+        st.success(
+            f"🟢 **LOW RISK**  |  "
+            f"{selected_risk_supplier}  |  "
+            f"{selected_row['Tier']}"
+        )
+    
+    
+    st.metric(
+        "Composite Risk Score",
+        f'{selected_row["Composite_Risk_Score"]:.1f}'
     )
-
-
+    
+    
     # --------------------------------------------------------
     # COMPONENT RISK SCORES
     # --------------------------------------------------------
-
-    st.markdown(
-        "**Risk Dimension Breakdown**"
+    
+    st.subheader(
+        "Risk Dimension Breakdown"
     )
-
+    
     col1, col2, col3, col4 = st.columns(4)
-
+    
     col1.metric(
         "Network Exposure",
         f'{selected_row["Network_Exposure_Score"]:.1f}'
     )
-
+    
     col2.metric(
         "Financial Risk",
         (
@@ -2351,29 +2329,26 @@ the available dimensions are reweighted where required.
             f'{selected_row["Financial_Risk_Score"]:.1f}'
         )
     )
-
+    
     col3.metric(
         "Operational Risk",
         f'{selected_row["Operational_Risk_Score"]:.1f}'
     )
-
+    
     col4.metric(
         "Geographic Risk",
         f'{selected_row["Geo_Risk_Score"]:.1f}'
     )
-
-
+    
+    
     # --------------------------------------------------------
     # EVIDENCE CONFIDENCE
     # --------------------------------------------------------
-
-    st.markdown(
-        f"""
-**Evidence Confidence:** 
-{selected_row["Evidence_Confidence (%)"]:.1f}%
-"""
+    
+    st.write(
+        f'**Evidence Confidence:** '
+        f'{selected_row["Evidence_Confidence (%)"]:.1f}%'
     )
-
 
     # --------------------------------------------------------
     # UNDERLYING INDICATORS
