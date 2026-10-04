@@ -758,58 +758,152 @@ def show_network_graph(
         selected_event_nodes or []
     )
 
+    # ========================================================
+    # UNCERTAINTY LAYER
+    # ========================================================
 
-    # --------------------------------------------------------
-    # Colors from original Colab graph
-    # --------------------------------------------------------
+    uncertainty_edges = [
+        {
+            "From": "Verdant Process Gases Ltd.",
+            "To": "IonPeak Semiconductor Ltd.",
+            "Status": "Reasonable inference",
+            "Color": "#E6A700"
+        },
+        {
+            "From": "Alder Bauxite Ltd.",
+            "To": "Quartz Alloy Ltd.",
+            "Status": "Unresolved hypothesis",
+            "Color": "#E67E22"
+        },
+        {
+            "From": "Solace Optics",
+            "To": "Grove Battery Controls Ltd.",
+            "Status": "Unresolved hypothesis",
+            "Color": "#E67E22"
+        }
+    ]
+
+    # Copy existing confirmed positions
+    display_positions = positions.copy()
+
+    # Place the three uncertainty nodes separately
+    display_positions[
+        "Verdant Process Gases Ltd."
+    ] = (
+        X_POSITIONS["Tier 3"],
+        -7.0
+    )
+
+    display_positions[
+        "Alder Bauxite Ltd."
+    ] = (
+        X_POSITIONS["Tier 3"],
+        -8.4
+    )
+
+    display_positions[
+        "Solace Optics"
+    ] = (
+        X_POSITIONS["Tier 2"],
+        -7.0
+    )
+
+
+    # ========================================================
+    # BOX GEOMETRY
+    # ========================================================
+
+    BOX_WIDTH = 2.55
+    BOX_HEIGHT = 0.72
+
+
+    def boundary_point(
+        source,
+        target
+    ):
+
+        x0, y0 = display_positions[source]
+        x1, y1 = display_positions[target]
+
+        dx = x1 - x0
+        dy = y1 - y0
+
+        if dx == 0 and dy == 0:
+            return x0, y0
+
+        tx = (
+            (BOX_WIDTH / 2) / abs(dx)
+            if dx != 0
+            else float("inf")
+        )
+
+        ty = (
+            (BOX_HEIGHT / 2) / abs(dy)
+            if dy != 0
+            else float("inf")
+        )
+
+        t = min(tx, ty)
+
+        return (
+            x0 + dx * t,
+            y0 + dy * t
+        )
+
+
+    # ========================================================
+    # COLORS
+    # ========================================================
 
     tier_colors = {
-
         "Tier 3": "#D6EAF8",
-
         "Tier 2": "#D5F5E3",
-
         "Tier 1": "#FCF3CF",
-
         "NovaDrive": "#F1948A"
     }
 
 
-    # --------------------------------------------------------
-    # Figure
-    # --------------------------------------------------------
+    # ========================================================
+    # FIGURE
+    # ========================================================
 
     fig = go.Figure()
 
 
-    # --------------------------------------------------------
-    # EDGES
-    # --------------------------------------------------------
+    # ========================================================
+    # CONFIRMED EDGES
+    # ========================================================
 
     for source, target in network_edges:
 
         if (
-            source not in positions
-            or
-            target not in positions
+            source not in display_positions
+            or target not in display_positions
         ):
             continue
 
-        x0, y0 = positions[source]
-        x1, y1 = positions[target]
+        start_x, start_y = boundary_point(
+            source,
+            target
+        )
+
+        end_x, end_y = boundary_point(
+            target,
+            source
+        )
 
 
-        # Affected edge
         affected_edge = (
-            source in highlighted_nodes
-            or
-            source in selected_event_nodes
-        ) and (
-            target in highlighted_nodes
-            or
-            target in selected_event_nodes
-            or
-            target == "NovaDrive Technologies"
+            (
+                source in highlighted_nodes
+                or source in selected_event_nodes
+            )
+            and
+            (
+                target in highlighted_nodes
+                or target in selected_event_nodes
+                or target == "NovaDrive Technologies"
+            )
         )
 
 
@@ -823,22 +917,28 @@ def show_network_graph(
 
             edge_color = "#777777"
             edge_width = 1.25
+
             opacity = (
-                0.22
+                0.20
                 if (
                     highlighted_nodes
-                    or
-                    selected_event_nodes
+                    or selected_event_nodes
                 )
                 else 0.60
             )
 
 
-        # Main edge
+        # Line
         fig.add_trace(
             go.Scatter(
-                x=[x0, x1],
-                y=[y0, y1],
+                x=[
+                    start_x,
+                    end_x
+                ],
+                y=[
+                    start_y,
+                    end_y
+                ],
                 mode="lines",
                 line=dict(
                     color=edge_color,
@@ -851,12 +951,12 @@ def show_network_graph(
         )
 
 
-        # Arrow head
+        # Arrowhead at box boundary
         fig.add_annotation(
-            x=x1,
-            y=y1,
-            ax=x0,
-            ay=y0,
+            x=end_x,
+            y=end_y,
+            ax=start_x,
+            ay=start_y,
             xref="x",
             yref="y",
             axref="x",
@@ -871,23 +971,101 @@ def show_network_graph(
         )
 
 
-    # --------------------------------------------------------
-    # NODE BOXES
-    # --------------------------------------------------------
+    # ========================================================
+    # UNCERTAINTY / HYPOTHESIS EDGES
+    # ========================================================
 
-    for node in network_nodes:
+    for edge in uncertainty_edges:
 
-        x, y = positions[node]
+        source = edge["From"]
+        target = edge["To"]
 
-        tier = get_tier(node)
+        start_x, start_y = boundary_point(
+            source,
+            target
+        )
 
-        base_color = tier_colors.get(
-            tier,
-            "#E5E7EB"
+        end_x, end_y = boundary_point(
+            target,
+            source
         )
 
 
+        fig.add_trace(
+            go.Scatter(
+                x=[
+                    start_x,
+                    end_x
+                ],
+                y=[
+                    start_y,
+                    end_y
+                ],
+                mode="lines",
+                line=dict(
+                    color=edge["Color"],
+                    width=2,
+                    dash="dash"
+                ),
+                opacity=0.9,
+                hoverinfo="text",
+                text=edge["Status"],
+                showlegend=False
+            )
+        )
+
+
+        fig.add_annotation(
+            x=end_x,
+            y=end_y,
+            ax=start_x,
+            ay=start_y,
+            xref="x",
+            yref="y",
+            axref="x",
+            ayref="y",
+            text="",
+            showarrow=True,
+            arrowhead=2,
+            arrowsize=1,
+            arrowwidth=2,
+            arrowcolor=edge["Color"],
+            opacity=0.9
+        )
+
+
+    # ========================================================
+    # NODE BOXES
+    # ========================================================
+
+    all_display_nodes = list(
+        display_positions.keys()
+    )
+
+
+    for node in all_display_nodes:
+
+        x, y = display_positions[node]
+
+
+        # Tier for uncertainty nodes
+        if node == "Verdant Process Gases Ltd.":
+            tier = "Tier 3"
+
+        elif node == "Alder Bauxite Ltd.":
+            tier = "Tier 3"
+
+        elif node == "Solace Optics":
+            tier = "Tier 2"
+
+        else:
+            tier = get_tier(node)
+
+
+        # ----------------------------------------------------
         # Event source
+        # ----------------------------------------------------
+
         if node in selected_event_nodes:
 
             fill_color = "#FCA5A5"
@@ -896,7 +1074,10 @@ def show_network_graph(
             opacity = 1.0
 
 
-        # Downstream affected
+        # ----------------------------------------------------
+        # Event downstream
+        # ----------------------------------------------------
+
         elif node in highlighted_nodes:
 
             fill_color = "#F87171"
@@ -905,7 +1086,26 @@ def show_network_graph(
             opacity = 1.0
 
 
+        # ----------------------------------------------------
+        # Uncertainty node
+        # ----------------------------------------------------
+
+        elif node in [
+            "Verdant Process Gases Ltd.",
+            "Alder Bauxite Ltd.",
+            "Solace Optics"
+        ]:
+
+            fill_color = "#F3F4F6"
+            border_color = "#E67E22"
+            border_width = 2
+            opacity = 0.75
+
+
+        # ----------------------------------------------------
         # NovaDrive
+        # ----------------------------------------------------
+
         elif node == "NovaDrive Technologies":
 
             fill_color = "#F1948A"
@@ -914,17 +1114,23 @@ def show_network_graph(
             opacity = 1.0
 
 
-        # Normal
+        # ----------------------------------------------------
+        # Normal confirmed node
+        # ----------------------------------------------------
+
         else:
 
-            fill_color = base_color
+            fill_color = tier_colors.get(
+                tier,
+                "#E5E7EB"
+            )
+
             border_color = "#666666"
             border_width = 1.2
 
             if (
                 highlighted_nodes
-                or
-                selected_event_nodes
+                or selected_event_nodes
             ):
 
                 opacity = 0.25
@@ -934,17 +1140,16 @@ def show_network_graph(
                 opacity = 1.0
 
 
-        # Approximate rounded-box dimensions
-        box_width = 2.55
-        box_height = 0.72
-
+        # ----------------------------------------------------
+        # Box
+        # ----------------------------------------------------
 
         fig.add_shape(
             type="rect",
-            x0=x - box_width / 2,
-            x1=x + box_width / 2,
-            y0=y - box_height / 2,
-            y1=y + box_height / 2,
+            x0=x - BOX_WIDTH / 2,
+            x1=x + BOX_WIDTH / 2,
+            y0=y - BOX_HEIGHT / 2,
+            y1=y + BOX_HEIGHT / 2,
             fillcolor=fill_color,
             line=dict(
                 color=border_color,
@@ -955,13 +1160,27 @@ def show_network_graph(
         )
 
 
+        # ----------------------------------------------------
+        # Label
+        # ----------------------------------------------------
+
+        label = (
+            node
+            .replace(
+                " Ltd.",
+                ""
+            )
+            .replace(
+                " Technologies",
+                ""
+            )
+        )
+
+
         fig.add_annotation(
             x=x,
             y=y,
-            text=wrap_label(
-                node,
-                width=19
-            ),
+            text=label,
             showarrow=False,
             font=dict(
                 size=11.5,
@@ -974,9 +1193,14 @@ def show_network_graph(
         )
 
 
-    # --------------------------------------------------------
+    # ========================================================
     # TIER HEADINGS
-    # --------------------------------------------------------
+    # ========================================================
+
+    max_y = max(
+        p[1]
+        for p in display_positions.values()
+    )
 
     headings = [
         ("Tier 3", 0),
@@ -985,18 +1209,12 @@ def show_network_graph(
         ("NovaDrive", 10.2)
     ]
 
+
     for heading, x in headings:
 
         fig.add_annotation(
             x=x,
-            y=(
-                max(
-                    [
-                        p[1]
-                        for p in positions.values()
-                    ]
-                ) + 1.25
-            ),
+            y=max_y + 0.8,
             text=f"<b>{heading}</b>",
             showarrow=False,
             font=dict(
@@ -1006,13 +1224,46 @@ def show_network_graph(
         )
 
 
-    # --------------------------------------------------------
+    # ========================================================
+    # LEGEND
+    # ========================================================
+
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="lines",
+            line=dict(
+                color="#E6A700",
+                width=2,
+                dash="dash"
+            ),
+            name="Reasonable inference"
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode="lines",
+            line=dict(
+                color="#E67E22",
+                width=2,
+                dash="dash"
+            ),
+            name="Unresolved hypothesis"
+        )
+    )
+
+
+    # ========================================================
     # LAYOUT
-    # --------------------------------------------------------
+    # ========================================================
 
     fig.update_layout(
 
-        height=760,
+        height=850,
 
         margin=dict(
             l=40,
@@ -1030,8 +1281,7 @@ def show_network_graph(
             range=[
                 -1.7,
                 11.7
-            ],
-            fixedrange=False
+            ]
         ),
 
         yaxis=dict(
@@ -1039,18 +1289,25 @@ def show_network_graph(
             range=[
                 min(
                     p[1]
-                    for p in positions.values()
-                ) - 1.2,
+                    for p in display_positions.values()
+                ) - 0.8,
 
                 max(
                     p[1]
-                    for p in positions.values()
-                ) + 1.7
-            ],
-            fixedrange=False
+                    for p in display_positions.values()
+                ) + 1.5
+            ]
         ),
 
-        showlegend=False,
+        showlegend=True,
+
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
 
         hovermode=False
     )
@@ -1065,25 +1322,29 @@ def show_network_graph(
         }
     )
 
+
+    # ========================================================
+    # CAPTION
+    # ========================================================
+
     if (
         highlighted_nodes
-        or
-        selected_event_nodes
+        or selected_event_nodes
     ):
 
         st.caption(
-            "Highlighted supplier = event source. "
-            "Red nodes and paths = confirmed downstream exposure. "
+            "Orange = directly affected supplier. "
+            "Red = downstream exposure. "
             "Faded nodes = not part of the affected path."
         )
 
     else:
 
         st.caption(
-            "Tier 3 → Tier 2 → Tier 1 → NovaDrive. "
-            "Use the controls above to investigate the network."
+            "Solid lines = confirmed relationships. "
+            "Dashed yellow = reasonable inference. "
+            "Dashed orange = unresolved hypothesis."
         )
-
 
 # ============================================================
 # EXCEL DOWNLOAD
