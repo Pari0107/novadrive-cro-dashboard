@@ -6,6 +6,14 @@
 
 The NovaDrive CRO Dashboard is a decision-support platform developed for Project Lighthouse | Consularium. It brings together supplier network visibility, risk prioritisation, event monitoring and alternate supplier discovery to help the CRO identify and respond to material supply-chain vulnerabilities.
 
+## Live Dashboard
+
+The complete interactive NovaDrive CRO Dashboard is available here:
+
+**[Open the Live Dashboard](https://novadrive-cro-dashboard-2rvgckgnlyaz6suafqh2n2.streamlit.app/)**
+
+The dashboard provides interactive views of the supplier network, supplier risk assessment, event risk intelligence and alternate supplier discovery.
+
 ## Part 1 — Supplier Network Reconstruction
 
 The supplier network was reconstructed using the case workbook's **Relationship Evidence**, rather than assuming that every organisation in the Supplier Universe is an active NovaDrive supplier.
