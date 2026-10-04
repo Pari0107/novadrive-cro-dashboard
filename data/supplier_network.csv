@@ -1,0 +1,32 @@
+Evidence ID,From,To,Evidence Role,NovaDrive Component,Program,Supplied Input,Facility,From Tier
+DOC-001,Aster Power Assemblies Ltd.,NovaDrive Technologies,Confirmed Tier-1 supply,M10,"P1, P3",,SITE-018,Tier 1
+DOC-003,Aster Power Assemblies Ltd.,NovaDrive Technologies,Confirmed Tier-1 supply,M20,P2,,SITE-018,Tier 1
+DOC-005,Boreal Power Systems Ltd.,NovaDrive Technologies,Confirmed Tier-1 supply,M10,"P1, P3",,SITE-025,Tier 1
+DOC-007,Boreal Power Systems Ltd.,NovaDrive Technologies,Confirmed Tier-1 supply,M20,P2,,SITE-025,Tier 1
+DOC-009,Cobalt Control Electronics Ltd.,NovaDrive Technologies,Confirmed Tier-1 supply,C10,"P1, P2, P3",,SITE-032,Tier 1
+DOC-011,Delta Capacitor Works Ltd.,NovaDrive Technologies,Confirmed Tier-1 supply,C20,"P1, P2",,SITE-039,Tier 1
+DOC-013,Estuary Thermal Systems Ltd.,NovaDrive Technologies,Confirmed Tier-1 supply,H20,"P2, P3",,SITE-046,Tier 1
+DOC-015,ForgeLine Enclosures Ltd.,NovaDrive Technologies,Confirmed Tier-1 supply,H10,P1,,SITE-053,Tier 1
+DOC-017,Grove Battery Controls Ltd.,NovaDrive Technologies,Confirmed Tier-1 supply,B10,P3,,SITE-060,Tier 1
+DOC-019,HarborSense Electronics Ltd.,NovaDrive Technologies,Confirmed Tier-1 supply,B10,P3,,SITE-067,Tier 1
+DOC-021,IonPeak Semiconductor Ltd.,Aster Power Assemblies Ltd.,Confirmed upstream supply,,M10/M20,power semiconductor dies,SITE-074,Tier 2
+DOC-023,IonPeak Semiconductor Ltd.,Boreal Power Systems Ltd.,Confirmed upstream supply,,M10/M20,power semiconductor dies,SITE-074,Tier 2
+DOC-025,Jade Printed Circuits Ltd.,Cobalt Control Electronics Ltd.,Confirmed upstream supply,,C10,printed circuit substrates,SITE-081,Tier 2
+DOC-027,Jade Printed Circuits Ltd.,Grove Battery Controls Ltd.,Confirmed upstream supply,,B10,printed circuit substrates,SITE-081,Tier 2
+DOC-029,Jade Printed Circuits Ltd.,HarborSense Electronics Ltd.,Confirmed upstream supply,,B10,printed circuit substrates,SITE-081,Tier 2
+DOC-031,Kestrel Microdevices Ltd.,Cobalt Control Electronics Ltd.,Confirmed upstream supply,,C10,microcontrollers,SITE-088,Tier 2
+DOC-033,Kestrel Microdevices Ltd.,Grove Battery Controls Ltd.,Confirmed upstream supply,,B10,microcontrollers,SITE-088,Tier 2
+DOC-035,Lumen Magnetics Ltd.,Aster Power Assemblies Ltd.,Confirmed upstream supply,,M10/M20,magnetic cores,SITE-095,Tier 2
+DOC-037,Lumen Magnetics Ltd.,Boreal Power Systems Ltd.,Confirmed upstream supply,,M10/M20,magnetic cores,SITE-095,Tier 2
+DOC-039,Meridian Dielectrics Ltd.,Delta Capacitor Works Ltd.,Confirmed upstream supply,,C20,dielectric film,SITE-102,Tier 2
+DOC-041,Nacre Foils Ltd.,Delta Capacitor Works Ltd.,Confirmed upstream supply,,C20,aluminum foil,SITE-109,Tier 2
+DOC-043,Orion Ceramics Ltd.,Aster Power Assemblies Ltd.,Confirmed upstream supply,,M10/M20,ceramic substrates,SITE-116,Tier 2
+DOC-045,Orion Ceramics Ltd.,Boreal Power Systems Ltd.,Confirmed upstream supply,,M10/M20,ceramic substrates,SITE-116,Tier 2
+DOC-047,Pine Thermal Metals Ltd.,Estuary Thermal Systems Ltd.,Confirmed upstream supply,,H20,thermal metals,SITE-123,Tier 2
+DOC-049,Quartz Alloy Ltd.,ForgeLine Enclosures Ltd.,Confirmed upstream supply,,H10,aluminum alloy,SITE-130,Tier 2
+DOC-051,Rill Connectors Ltd.,Cobalt Control Electronics Ltd.,Confirmed upstream supply,,C10,connectors,SITE-137,Tier 2
+DOC-056,Umber Silicon Carbide Ltd.,IonPeak Semiconductor Ltd.,Confirmed upstream supply,,M10/M20,silicon-carbide wafers,SITE-158,Tier 3
+DOC-060,Warden Copper Foil Ltd.,Jade Printed Circuits Ltd.,Confirmed upstream supply,,C10/B10,copper foil,SITE-172,Tier 3
+DOC-064,Xenon Resin Ltd.,Jade Printed Circuits Ltd.,Confirmed upstream supply,,C10/B10,resin,SITE-179,Tier 3
+DOC-066,Yarrow Specialty Minerals Ltd.,Orion Ceramics Ltd.,Confirmed upstream supply,,M10/M20,specialty minerals,SITE-186,Tier 3
+DOC-070,Zenith Polymer Ltd.,Meridian Dielectrics Ltd.,Confirmed upstream supply,,C20,polymer,SITE-193,Tier 3
