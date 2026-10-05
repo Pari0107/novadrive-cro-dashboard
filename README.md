@@ -54,7 +54,7 @@ The dashboard allows users to rank suppliers, inspect component risk scores and 
 
 ## Part 3 — Event Risk Intelligence
 
-External event signals are matched against the confirmed supplier network to determine whether they represent a meaningful NovaDrive exposure.
+**Given or newly entered external event signals are matched against the confirmed supplier network** to determine whether they represent a meaningful NovaDrive exposure.
 
 The process includes:
 
@@ -66,7 +66,7 @@ The process includes:
 - Management alert generation
 - Recommended next actions
 
-The dashboard also supports analysis of new events entered in natural language and can highlight the affected supplier and downstream network.
+The dashboard also supports **new events entered in natural language** and can highlight the affected supplier and downstream network.
 
 **Key principle:** An event is not treated as a supplier risk until the correct entity, facility or geography has been validated. Duplicate, stale and unrelated signals are filtered out.
 
