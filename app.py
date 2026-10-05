@@ -6,6 +6,8 @@ from io import BytesIO
 
 import plotly.graph_objects as go
 
+from alternate_supplier_engine import find_alternates
+
 
 # ============================================================
 # PAGE CONFIGURATION
