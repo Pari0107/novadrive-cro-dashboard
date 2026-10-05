@@ -3663,6 +3663,3 @@ elif page == "Alternate Suppliers":
             "No verified alternate suppliers were found "
             "for this supplier using the current public-source search."
         )
-- Identify qualification or engineering validation required
-"""
-    )
