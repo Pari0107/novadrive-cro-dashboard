@@ -72,22 +72,18 @@ The dashboard also supports analysis of new events entered in natural language a
 
 ## Part 4 — Alternate Supplier Discovery
 
-When a material supplier or upstream node is flagged, the platform identifies potential alternate suppliers using current public sources.
+When a material supplier or upstream node is flagged as **HIGH** or **CRITICAL** risk, the platform retrieves precomputed alternate supplier recommendations from structured B2B intelligence files (`novadrive_alternate_supplier_recommendations_clean.xlsx` / `alternate_supplier_recommendations.xlsx`).
 
-The search and initial assessment consider:
+The alternate supplier discovery engine standardizes and filters candidate records based on:
 
-- Affected component
-- Application context
-- Technical capability
-- Application relevance
-- Manufacturing footprint
-- Scale and industry presence
-- Public-source evidence
-- Qualification requirements
+- **Incumbent Alignment:** Exact and fuzzy name normalization matching flagged incumbent entities across the network.
+- **Strict Risk Filtering:** Retains candidates specifically associated with **HIGH** and **CRITICAL** risk suppliers.
+- **Component & Relationship Context:** Matches component IDs, component names, and relationship-based requirements to target applications.
+- **4-Factor Technical Fitment Evaluation:** Evaluates candidate suitability across *Technical Fit*, *Application Fit*, *Manufacturing Footprint*, and *Industry / Scale*.
+- **Traceability & Evidence Logging:** Tracks public source URLs, verification timestamps (`Source Date`), and raw snippet evidence.
+- **Engineering Action Plans:** Defines required next steps and qualification lead times prior to onboarding.
 
-Supplier risk is kept separate from alternate-supplier fitment.
-
-**Key principle:** Alternatives are shortlisted based on the affected component and application rather than generic industry similarity. Shortlisted candidates still require commercial, technical and engineering validation before qualification.
+**Key principle:** Supplier risk is strictly decoupled from candidate fitment. Shortlisted candidates are pre-filtered based on exact component utility and application context, providing immediate audit-ready options that still undergo commercial and technical qualification before ramp-up.
 
 ## Data & Files
 
