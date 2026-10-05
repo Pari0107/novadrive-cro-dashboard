@@ -72,7 +72,7 @@ The dashboard also supports **new events entered in natural language** and can h
 
 ## Part 4 — Alternate Supplier Discovery
 
-When a material supplier or upstream node is flagged as **HIGH** or **CRITICAL** risk, the platform retrieves precomputed alternate supplier recommendations from structured B2B intelligence files (`novadrive_alternate_supplier_recommendations_clean.xlsx` / `alternate_supplier_recommendations.xlsx`).
+When a material supplier or upstream node is flagged as **HIGH** or **CRITICAL** risk, the platform retrieves precomputed alternate supplier recommendations from structured B2B intelligence files (`novadrive_alternate_supplier_recommendations_clean.xlsx`).
 
 The alternate supplier discovery engine standardizes and filters candidate records based on:
 
