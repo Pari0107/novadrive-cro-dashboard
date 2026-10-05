@@ -85,6 +85,18 @@ The alternate supplier discovery engine standardizes and filters candidate recor
 
 **Key principle:** Supplier risk is strictly decoupled from candidate fitment. Shortlisted candidates are pre-filtered based on exact component utility and application context, providing immediate audit-ready options that still undergo commercial and technical qualification before ramp-up.
 
+## Code Structure
+
+### `app.py`
+The main Streamlit application powering the NovaDrive CRO Dashboard.  
+Integrates the supplier network, risk assessment, event intelligence and alternate-supplier workflows.  
+Handles the interactive dashboard, network visualisation, event analysis and management alerts.
+
+### `alternate_supplier_engine.py`
+Handles the alternate-supplier recommendation workflow.  
+Reads the precomputed supplier recommendation dataset and filters relevant HIGH/CRITICAL suppliers.  
+Returns ranked alternatives with fitment scores, evidence, supplier risk and qualification requirements.
+
 ## Data & Files
 
 ### `event_alerts.csv`
