@@ -1,82 +1,164 @@
 # ============================================================
 # NOVADRIVE — ALTERNATE SUPPLIER ENGINE
-# Precomputed recommendation version
+# PRECOMPUTED EXCEL VERSION
 # ============================================================
 
 import os
+import glob
 import pandas as pd
 
 
 # ============================================================
-# CONFIG
+# FIND THE EXCEL FILE
 # ============================================================
-
-# The Excel file should be placed in the same repository under:
-# data/alternate_supplier_recommendations.xlsx
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-ALTERNATE_FILE = os.path.join(
-    BASE_DIR,
-    "data",
-    "alternate_supplier_recommendations_clean.xlsx"
-)
+
+POSSIBLE_FILES = [
+    os.path.join(
+        BASE_DIR,
+        "data",
+        "novadrive_alternate_supplier_recommendations_clean.xlsx"
+    ),
+
+    os.path.join(
+        BASE_DIR,
+        "data",
+        "novadrive_alternate_supplier_recommendations_clean(1).xlsx"
+    ),
+
+    os.path.join(
+        BASE_DIR,
+        "data",
+        "alternate_supplier_recommendations.xlsx"
+    ),
+
+    os.path.join(
+        BASE_DIR,
+        "data",
+        "alternate_supplier_recommendations_clean.xlsx"
+    ),
+]
+
+
+def get_excel_file():
+
+    for path in POSSIBLE_FILES:
+
+        if os.path.exists(path):
+            return path
+
+    # Last-resort search for any Excel file containing
+    # "alternate" in the data folder.
+
+    data_folder = os.path.join(
+        BASE_DIR,
+        "data"
+    )
+
+    candidates = glob.glob(
+        os.path.join(
+            data_folder,
+            "*alternate*.xlsx"
+        )
+    )
+
+    if candidates:
+        return candidates[0]
+
+    raise FileNotFoundError(
+        "Alternate supplier Excel file was not found in the data folder."
+    )
 
 
 # ============================================================
-# LOAD PRECOMPUTED RESULTS
+# LOAD DATA
 # ============================================================
 
 def load_alternate_supplier_data():
 
-    if not os.path.exists(ALTERNATE_FILE):
-        raise FileNotFoundError(
-            f"Alternate supplier file not found: {ALTERNATE_FILE}"
-        )
+    excel_file = get_excel_file()
 
-    df = pd.read_excel(ALTERNATE_FILE)
+    df = pd.read_excel(
+        excel_file,
+        sheet_name="Alternate Suppliers"
+    )
 
     # Clean column names
     df.columns = [
-        str(col).strip()
-        for col in df.columns
+        str(c).strip()
+        for c in df.columns
     ]
 
-    # Numeric fields
+    # --------------------------------------------------------
+    # Keep ONLY HIGH / CRITICAL supplier recommendations
+    # --------------------------------------------------------
+
+    if "Risk Category" in df.columns:
+
+        df["Risk Category"] = (
+            df["Risk Category"]
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
+
+        df = df[
+            df["Risk Category"].isin(
+                ["HIGH", "CRITICAL"]
+            )
+        ].copy()
+
+    # --------------------------------------------------------
+    # Numeric columns
+    # --------------------------------------------------------
+
     numeric_columns = [
         "Technical Fit",
         "Application Fit",
         "Manufacturing Footprint",
         "Industry / Scale",
-        "Fitment Score"
+        "Fitment Score",
+        "Supplier Risk Score"
     ]
 
-    for col in numeric_columns:
+    for column in numeric_columns:
 
-        if col in df.columns:
+        if column in df.columns:
 
-            df[col] = pd.to_numeric(
-                df[col],
+            df[column] = pd.to_numeric(
+                df[column],
                 errors="coerce"
             )
 
-    # Clean incumbent supplier names
-    if "Incumbent Supplier" in df.columns:
+    # --------------------------------------------------------
+    # Clean text fields
+    # --------------------------------------------------------
 
-        df["Incumbent Supplier"] = (
-            df["Incumbent Supplier"]
-            .astype(str)
-            .str.strip()
-        )
+    text_columns = [
+        "Incumbent Supplier",
+        "Alternate Supplier",
+        "Component ID",
+        "Component",
+        "Risk Category",
+        "Supplier Verification",
+        "Evidence",
+        "Source Date",
+        "Source URL",
+        "Qualification Next Step"
+    ]
 
-    # Clean alternate supplier names
-    if "Alternate Supplier" in df.columns:
+    for column in text_columns:
 
-        df["Alternate Supplier"] = (
-            df["Alternate Supplier"]
-            .astype(str)
-            .str.strip()
-        )
+        if column in df.columns:
+
+            df[column] = (
+                df[column]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+            )
 
     return df
 
@@ -92,21 +174,11 @@ def normalize_supplier_name(name):
 
     name = str(name).strip().lower()
 
-    # Remove common legal suffixes so that:
-    #
-    # "Boreal Power Systems"
-    #
-    # and
-    #
-    # "Boreal Power Systems Ltd."
-    #
-    # still match.
-
     suffixes = [
         " private limited",
+        " private ltd",
         " pvt ltd",
         " pvt. ltd.",
-        " private ltd",
         " limited",
         " ltd.",
         " ltd",
@@ -122,14 +194,17 @@ def normalize_supplier_name(name):
 
         if name.endswith(suffix):
 
-            name = name[:-len(suffix)].strip()
+            name = name[
+                :-len(suffix)
+            ].strip()
+
             break
 
     return name
 
 
 # ============================================================
-# FIND ALTERNATE SUPPLIERS
+# MAIN FUNCTION
 # ============================================================
 
 def find_alternates(
@@ -138,12 +213,12 @@ def find_alternates(
     max_candidates=8
 ):
     """
-    Return precomputed alternate suppliers for the selected
-    NovaDrive incumbent supplier.
+    Returns precomputed alternate suppliers from the Excel
+    dataset.
 
-    The function intentionally keeps the same interface as
-    the previous live-search engine so the Streamlit dashboard
-    does not need to change.
+    This deliberately keeps the same function signature as
+    the previous live-search engine so app.py does not need
+    to change.
     """
 
     # --------------------------------------------------------
@@ -153,82 +228,88 @@ def find_alternates(
     df = load_alternate_supplier_data()
 
     if df.empty:
+
         return pd.DataFrame()
 
 
     # --------------------------------------------------------
-    # Match incumbent supplier
+    # Normalise selected supplier
     # --------------------------------------------------------
 
     target = normalize_supplier_name(
         supplier_name
     )
 
-    df["_normalized_incumbent"] = (
+
+    df["_supplier_normalized"] = (
         df["Incumbent Supplier"]
         .apply(normalize_supplier_name)
     )
 
-    matches = df[
-        df["_normalized_incumbent"] == target
+
+    # --------------------------------------------------------
+    # Exact supplier match
+    # --------------------------------------------------------
+
+    results = df[
+        df["_supplier_normalized"] == target
     ].copy()
 
 
     # --------------------------------------------------------
-    # If exact normalized match fails, try substring match
+    # Fallback matching
     # --------------------------------------------------------
 
-    if matches.empty:
+    if results.empty:
 
-        supplier_text = str(
-            supplier_name
-        ).strip().lower()
+        target_words = [
+            word
+            for word in target.split()
+            if len(word) > 2
+        ]
 
-        matches = df[
-            df["Incumbent Supplier"]
-            .astype(str)
-            .str.lower()
-            .str.contains(
-                supplier_text,
-                regex=False,
-                na=False
+        if target_words:
+
+            mask = pd.Series(
+                True,
+                index=df.index
             )
-        ].copy()
+
+            for word in target_words:
+
+                mask = (
+                    mask
+                    &
+                    df["_supplier_normalized"]
+                    .str.contains(
+                        word,
+                        regex=False,
+                        na=False
+                    )
+                )
+
+            results = df[
+                mask
+            ].copy()
 
 
     # --------------------------------------------------------
-    # Nothing found
+    # No recommendations
     # --------------------------------------------------------
 
-    if matches.empty:
+    if results.empty:
 
         return pd.DataFrame()
-
-
-    # --------------------------------------------------------
-    # Risk category
-    #
-    # We deliberately DO NOT filter recommendations based
-    # on risk category.
-    #
-    # The Excel already contains the correct recommendation
-    # set for every incumbent supplier.
-    # --------------------------------------------------------
 
 
     # --------------------------------------------------------
     # Sort by fitment score
     # --------------------------------------------------------
 
-    if "Fitment Score" in matches.columns:
+    if "Fitment Score" in results.columns:
 
-        matches["Fitment Score"] = pd.to_numeric(
-            matches["Fitment Score"],
-            errors="coerce"
-        )
-
-        matches = matches.sort_values(
-            by="Fitment Score",
+        results = results.sort_values(
+            "Fitment Score",
             ascending=False,
             na_position="last"
         )
@@ -236,24 +317,21 @@ def find_alternates(
 
     # --------------------------------------------------------
     # Remove duplicate alternate suppliers
-    #
-    # This prevents the same company appearing multiple
-    # times if it was found for multiple component records.
     # --------------------------------------------------------
 
-    if "Alternate Supplier" in matches.columns:
+    if "Alternate Supplier" in results.columns:
 
-        matches = matches.drop_duplicates(
+        results = results.drop_duplicates(
             subset=["Alternate Supplier"],
             keep="first"
         )
 
 
     # --------------------------------------------------------
-    # Return requested number of candidates
+    # Return top candidates
     # --------------------------------------------------------
 
-    matches = matches.head(
+    results = results.head(
         max_candidates
     ).copy()
 
@@ -262,18 +340,18 @@ def find_alternates(
     # Remove helper column
     # --------------------------------------------------------
 
-    if "_normalized_incumbent" in matches.columns:
+    if "_supplier_normalized" in results.columns:
 
-        matches = matches.drop(
-            columns=["_normalized_incumbent"]
+        results = results.drop(
+            columns=["_supplier_normalized"]
         )
 
 
     # --------------------------------------------------------
-    # Make sure expected dashboard columns exist
+    # Guarantee dashboard columns
     # --------------------------------------------------------
 
-    expected_columns = [
+    required_columns = [
 
         "Incumbent Supplier",
         "Risk Category",
@@ -287,6 +365,8 @@ def find_alternates(
         "Manufacturing Footprint",
         "Industry / Scale",
         "Fitment Score",
+        "Supplier Risk",
+        "Supplier Risk Score",
         "Evidence",
         "Source Date",
         "Source URL",
@@ -294,24 +374,30 @@ def find_alternates(
 
     ]
 
-    for col in expected_columns:
 
-        if col not in matches.columns:
+    for column in required_columns:
 
-            matches[col] = ""
+        if column not in results.columns:
+
+            results[column] = ""
 
 
     # --------------------------------------------------------
-    # Return in the same column structure
+    # Final column order
     # --------------------------------------------------------
 
-    return matches[expected_columns].reset_index(
+    results = results[
+        required_columns
+    ].reset_index(
         drop=True
     )
 
 
+    return results
+
+
 # ============================================================
-# OPTIONAL ALIAS
+# ALIAS
 # ============================================================
 
 def get_alternate_suppliers(
