@@ -3231,174 +3231,174 @@ elif page == "Events & Alerts":
                         )
 
 
-    # ----------------------------------------------------
-    # ALTERNATE SUPPLIER OPTION
-    # ----------------------------------------------------
+    # # ----------------------------------------------------
+    # # ALTERNATE SUPPLIER OPTION
+    # # ----------------------------------------------------
     
-    if affected_suppliers:
+    # if affected_suppliers:
     
-        st.divider()
+    #     st.divider()
     
-        st.subheader(
-            "Supply Continuity Option"
-        )
+    #     st.subheader(
+    #         "Supply Continuity Option"
+    #     )
     
-        st.write(
-            "Would you like to identify alternate suppliers "
-            "for an affected supplier?"
-        )
+    #     st.write(
+    #         "Would you like to identify alternate suppliers "
+    #         "for an affected supplier?"
+    #     )
     
-        alternate_supplier_choices = [
-            supplier
-            for supplier in affected_suppliers
-            if supplier != "NovaDrive Technologies"
-        ]
+    #     alternate_supplier_choices = [
+    #         supplier
+    #         for supplier in affected_suppliers
+    #         if supplier != "NovaDrive Technologies"
+    #     ]
     
-        if alternate_supplier_choices:
+    #     if alternate_supplier_choices:
     
-            selected_event_alternate = st.selectbox(
-                "Select affected supplier",
-                alternate_supplier_choices,
-                key="event_alternate_supplier"
-            )
+    #         selected_event_alternate = st.selectbox(
+    #             "Select affected supplier",
+    #             alternate_supplier_choices,
+    #             key="event_alternate_supplier"
+    #         )
     
-            if st.button(
-                "🔎 Find Alternate Suppliers",
-                key="event_find_alternates",
-                type="primary"
-            ):
+    #         if st.button(
+    #             "🔎 Find Alternate Suppliers",
+    #             key="event_find_alternates",
+    #             type="primary"
+    #         ):
     
-                with st.spinner(
-                    "Searching public sources for suitable alternatives..."
-                ):
+    #             with st.spinner(
+    #                 "Searching public sources for suitable alternatives..."
+    #             ):
     
-                    try:
+    #                 try:
     
-                        # Get supplier risk category dynamically
-                        risk_match = supplier_risk[
-                            supplier_risk["Legal Name"]
-                            .astype(str)
-                            .str.lower()
-                            ==
-                            selected_event_alternate.lower()
-                        ]
+    #                     # Get supplier risk category dynamically
+    #                     risk_match = supplier_risk[
+    #                         supplier_risk["Legal Name"]
+    #                         .astype(str)
+    #                         .str.lower()
+    #                         ==
+    #                         selected_event_alternate.lower()
+    #                     ]
     
-                        if not risk_match.empty:
+    #                     if not risk_match.empty:
     
-                            event_supplier_risk = str(
-                                risk_match.iloc[0][
-                                    "Risk_Category"
-                                ]
-                            )
+    #                         event_supplier_risk = str(
+    #                             risk_match.iloc[0][
+    #                                 "Risk_Category"
+    #                             ]
+    #                         )
     
-                        else:
+    #                     else:
     
-                            event_supplier_risk = "—"
+    #                         event_supplier_risk = "—"
     
-                        alternate_results = run_alternate_search(
-                            selected_event_alternate,
-                            event_supplier_risk,
-                            max_candidates=8
-                        )
+    #                     alternate_results = run_alternate_search(
+    #                         selected_event_alternate,
+    #                         event_supplier_risk,
+    #                         max_candidates=8
+    #                     )
     
-                        st.session_state[
-                            "event_alternate_results"
-                        ] = alternate_results
+    #                     st.session_state[
+    #                         "event_alternate_results"
+    #                     ] = alternate_results
     
-                        st.session_state[
-                            "event_alternate_supplier"
-                        ] = selected_event_alternate
+    #                     st.session_state[
+    #                         "event_alternate_supplier"
+    #                     ] = selected_event_alternate
     
-                    except Exception as e:
+    #                 except Exception as e:
     
-                        st.error(
-                            f"Alternate supplier search failed: {e}"
-                        )
+    #                     st.error(
+    #                         f"Alternate supplier search failed: {e}"
+    #                     )
     
-            event_alternate_results = st.session_state.get(
-                "event_alternate_results",
-                pd.DataFrame()
-            )
+    #         event_alternate_results = st.session_state.get(
+    #             "event_alternate_results",
+    #             pd.DataFrame()
+    #         )
     
-            event_result_supplier = st.session_state.get(
-                "event_alternate_supplier",
-                ""
-            )
+    #         event_result_supplier = st.session_state.get(
+    #             "event_alternate_supplier",
+    #             ""
+    #         )
     
-            if (
-                not event_alternate_results.empty
-                and
-                event_result_supplier
-                == selected_event_alternate
-            ):
+    #         if (
+    #             not event_alternate_results.empty
+    #             and
+    #             event_result_supplier
+    #             == selected_event_alternate
+    #         ):
     
-                st.divider()
+    #             st.divider()
     
-                st.subheader(
-                    f"Alternate Suppliers — "
-                    f"{selected_event_alternate}"
-                )
+    #             st.subheader(
+    #                 f"Alternate Suppliers — "
+    #                 f"{selected_event_alternate}"
+    #             )
     
-                st.caption(
-                    "These alternatives are identified using the "
-                    "affected supplier's actual relationship and "
-                    "component context."
-                )
+    #             st.caption(
+    #                 "These alternatives are identified using the "
+    #                 "affected supplier's actual relationship and "
+    #                 "component context."
+    #             )
     
-                for i, (_, row) in enumerate(
-                    event_alternate_results.iterrows(),
-                    start=1
-                ):
+    #             for i, (_, row) in enumerate(
+    #                 event_alternate_results.iterrows(),
+    #                 start=1
+    #             ):
     
-                    with st.container():
+    #                 with st.container():
     
-                        st.markdown(
-                            f"### {i}. "
-                            f"{row['Alternate Supplier']}"
-                        )
+    #                     st.markdown(
+    #                         f"### {i}. "
+    #                         f"{row['Alternate Supplier']}"
+    #                     )
     
-                        col1, col2, col3 = st.columns(3)
+    #                     col1, col2, col3 = st.columns(3)
     
-                        col1.metric(
-                            "Fitment Score",
-                            f"{row['Fitment Score']:.1f}/100"
-                        )
+    #                     col1.metric(
+    #                         "Fitment Score",
+    #                         f"{row['Fitment Score']:.1f}/100"
+    #                     )
     
-                        col2.metric(
-                            "Technical Fit",
-                            f"{row['Technical Fit']:.1f}"
-                        )
+    #                     col2.metric(
+    #                         "Technical Fit",
+    #                         f"{row['Technical Fit']:.1f}"
+    #                     )
     
-                        col3.metric(
-                            "Application Fit",
-                            f"{row['Application Fit']:.1f}"
-                        )
+    #                     col3.metric(
+    #                         "Application Fit",
+    #                         f"{row['Application Fit']:.1f}"
+    #                     )
     
-                        st.write(
-                            f"**Component:** "
-                            f"{row['Component'] or row['Component ID']}"
-                        )
+    #                     st.write(
+    #                         f"**Component:** "
+    #                         f"{row['Component'] or row['Component ID']}"
+    #                     )
     
-                        st.write(
-                            f"**Supplier Risk:** "
-                            f"{row['Supplier Risk']}"
-                        )
+    #                     st.write(
+    #                         f"**Supplier Risk:** "
+    #                         f"{row['Supplier Risk']}"
+    #                     )
     
-                        st.write(
-                            f"**Evidence:** "
-                            f"{row['Evidence']}"
-                        )
+    #                     st.write(
+    #                         f"**Evidence:** "
+    #                         f"{row['Evidence']}"
+    #                     )
     
-                        st.write(
-                            f"**Qualification:** "
-                            f"{row['Qualification Next Step']}"
-                        )
+    #                     st.write(
+    #                         f"**Qualification:** "
+    #                         f"{row['Qualification Next Step']}"
+    #                     )
     
-                        st.markdown(
-                            f"[View public source]({row['Source URL']})"
-                        )
+    #                     st.markdown(
+    #                         f"[View public source]({row['Source URL']})"
+    #                     )
     
-                        st.divider()
+    #                     st.divider()
 
 # ============================================================
 # ALTERNATE SUPPLIERS
