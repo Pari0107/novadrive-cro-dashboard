@@ -4,3 +4,7 @@ plotly
 openpyxl
 networkx
 numpy
+requests
+beautifulsoup4
+lxml
+ddgs
