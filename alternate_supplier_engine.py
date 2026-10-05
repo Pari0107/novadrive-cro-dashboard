@@ -19,7 +19,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ALTERNATE_FILE = os.path.join(
     BASE_DIR,
     "data",
-    "alternate_supplier_recommendations.xlsx"
+    "alternate_supplier_recommendations_clean.xlsx"
 )
 
 
