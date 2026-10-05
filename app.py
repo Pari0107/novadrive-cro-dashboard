@@ -3426,23 +3426,28 @@ elif page == "Alternate Suppliers":
     # SUPPLIER SELECTION
     # --------------------------------------------------------
 
-    # Only show suppliers with HIGH / CRITICAL established risk
-    high_critical_suppliers = set(
-        supplier_risk[
-            supplier_risk["Risk_Category"]
-            .astype(str)
-            .str.upper()
-            .isin(["HIGH", "CRITICAL"])
-        ]["Legal Name"]
-        .astype(str)
-    )
+# --------------------------------------------------------
+# ONLY SHOW SUPPLIERS WITH USABLE ALTERNATE DATA
+# --------------------------------------------------------
+
+    usable_alternate_suppliers = {
+        "umber silicon carbide ltd.",
+        "ionpeak semiconductor ltd.",
+        "meridian dielectrics ltd.",
+        "jade printed circuits ltd.",
+        "grove battery controls ltd.",
+        "cobalt control electronics ltd.",
+        "boreal power systems ltd."
+        "lumen magnetics ltd."
+    }
     
     supplier_options = [
         x
         for x in network_nodes
         if (
             x != "NovaDrive Technologies"
-            and x in high_critical_suppliers
+            and str(x).strip().lower()
+            in usable_alternate_suppliers
         )
     ]
 
