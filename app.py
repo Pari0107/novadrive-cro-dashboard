@@ -3426,10 +3426,24 @@ elif page == "Alternate Suppliers":
     # SUPPLIER SELECTION
     # --------------------------------------------------------
 
+    # Only show suppliers with HIGH / CRITICAL established risk
+    high_critical_suppliers = set(
+        supplier_risk[
+            supplier_risk["Risk_Category"]
+            .astype(str)
+            .str.upper()
+            .isin(["HIGH", "CRITICAL"])
+        ]["Legal Name"]
+        .astype(str)
+    )
+    
     supplier_options = [
         x
         for x in network_nodes
-        if x != "NovaDrive Technologies"
+        if (
+            x != "NovaDrive Technologies"
+            and x in high_critical_suppliers
+        )
     ]
 
     selected_alternate_supplier = st.selectbox(
